@@ -110,4 +110,11 @@ final class SettingsTests: XCTestCase {
             interval: eacInterval
         ))
     }
+
+    func testUpNextAutoDownloadLimitDefaultsToEntireQueue() {
+        UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextLimitKey)
+        defer { UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextLimitKey) }
+
+        XCTAssertEqual(Settings.upNextAutoDownloadLimit(), .entireQueue)
+    }
 }

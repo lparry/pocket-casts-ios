@@ -78,6 +78,8 @@ class Settings: NSObject {
     // MARK: - Up Next Auto Download
 
     private static let autoDownloadUpNext = "SJAutoDownloadUpNext"
+    static let autoDownloadUpNextLimitKey = "SJAutoDownloadUpNextLimit"
+
     static var downloadUpNextEpisodes: Bool {
         get {
             UserDefaults.standard.bool(forKey: Settings.autoDownloadUpNext)
@@ -86,6 +88,15 @@ class Settings: NSObject {
             UserDefaults.standard.set(newValue, forKey: Settings.autoDownloadUpNext)
             trackValueToggled(.settingsAutoDownloadUpNextToggled, enabled: newValue)
         }
+    }
+
+    class func upNextAutoDownloadLimit() -> UpNextAutoDownloadLimit {
+        UpNextAutoDownloadLimit(rawValue: UserDefaults.standard.integer(forKey: autoDownloadUpNextLimitKey)) ?? .entireQueue
+    }
+
+    class func setUpNextAutoDownloadLimit(_ limit: UpNextAutoDownloadLimit) {
+        UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextLimitKey)
+        trackValueChanged(.settingsAutoDownloadUpNextLimitChanged, value: limit.analyticsValue)
     }
 
     // MARK: - Mobile Data

@@ -2503,8 +2503,17 @@
 /* Subtitle explaining the toggle to auto download New Episodes. */
 "settings_auto_downloads_subtitle_new_episodes" = "Automatically download new episodes, save episodes from newly followed shows, and manage your storage by setting a limit on how many episodes are saved.";
 
-/* Subtitle explaining the toggle to auto download items in the Up Next Queue. */
-"settings_auto_downloads_subtitle_up_next" = "Download episodes added to Up Next.";
+/* Subtitle explaining how the Up Next auto-download limit behaves. */
+"settings_auto_downloads_subtitle_up_next" = "Download episodes at the front of Up Next. Existing downloads aren't removed when they move outside this range.";
+
+/* Label for choosing how many episodes at the front of Up Next should be automatically downloaded. */
+"settings_auto_downloads_up_next_limit" = "Download ahead";
+
+/* Option to automatically download every episode in Up Next. */
+"settings_auto_downloads_up_next_entire_queue" = "Entire queue";
+
+/* Option to automatically download a limited number of episodes at the front of Up Next. '%1$@' is the episode count. */
+"settings_auto_downloads_up_next_first_episodes_format" = "First %1$@ episodes";
 
 /* Section Header for selecting the options for setting the app badge based on the user's filters. */
 "settings_badge_filter_header" = "EPISODE FILTER COUNT";
@@ -6671,7 +6680,6 @@
 
 /* tv settings - message shown when the subscription was purchased on a different platform and must be managed there */
 "tv_settings_subscription_other_platform" = "This subscription was made on another platform. Please use that platform to manage the subscription.";
-
 
 /* tv create account step - scan the QR code */
 "tv_create_account_step_scan" = "Scan the QR code or go to %1$@";

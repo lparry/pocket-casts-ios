@@ -74,6 +74,40 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertTrue(mockDataManager.savedPlaylistEpisodes.isEmpty, "Reordering one episode should be a no-op")
     }
 
+    func testAutoDownloadEntireQueueReturnsEveryEpisodeInOrder() {
+        let queue = [
+            playlistEpisode(uuid: "now-playing", position: 0),
+            playlistEpisode(uuid: "a", position: 1),
+            playlistEpisode(uuid: "b", position: 2)
+        ]
+
+        let result = PlaybackQueue.episodeUUIDsToAutoDownload(from: queue, limit: .entireQueue)
+
+        XCTAssertEqual(result, ["now-playing", "a", "b"])
+    }
+
+    func testAutoDownloadLimitIncludesNowPlayingAndUsesQueuePositions() {
+        let queue = (0 ..< 12).map {
+            playlistEpisode(uuid: "episode-\($0)", position: Int32($0))
+        }
+
+        let result = PlaybackQueue.episodeUUIDsToAutoDownload(from: queue, limit: .ten)
+
+        XCTAssertEqual(result, (0 ..< 10).map { "episode-\($0)" })
+    }
+
+    func testAutoDownloadLimitDoesNotBackfillPastUnresolvedQueueEntries() {
+        let queue = (0 ..< 12).map {
+            playlistEpisode(uuid: $0 == 4 ? "unresolved" : "episode-\($0)", position: Int32($0))
+        }
+
+        let result = PlaybackQueue.episodeUUIDsToAutoDownload(from: queue, limit: .ten)
+
+        XCTAssertEqual(result.count, 10)
+        XCTAssertTrue(result.contains("unresolved"))
+        XCTAssertFalse(result.contains("episode-10"))
+    }
+
     private func playlistEpisode(uuid: String, position: Int32) -> PlaylistEpisode {
         let playlistEpisode = PlaylistEpisode()
         playlistEpisode.episodeUuid = uuid

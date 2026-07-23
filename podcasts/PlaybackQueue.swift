@@ -9,6 +9,7 @@ class PlaybackQueue: NSObject {
 
     private let syncTimerDelay: TimeInterval = 5
     private let interactionGracePeriod: TimeInterval = 10
+    private let autoDownloadQueue = DispatchQueue(label: "au.com.pocketcasts.upNextAutoDownload")
     private var syncTimer: Timer?
     private var lastUserInteractionTime: Date?
 
@@ -390,13 +391,25 @@ class PlaybackQueue: NSObject {
     private func checkAllForAutoDownload() {
         if !Settings.downloadUpNextEpisodes() { return }
 
-        DispatchQueue.global().async { [weak self] in
+        autoDownloadQueue.async { [weak self] in
             guard let self else { return }
-            let episodes = self.allEpisodes(includeNowPlaying: true)
-            for episode in episodes {
+
+            guard Settings.downloadUpNextEpisodes() else { return }
+
+            let episodeUUIDs = Self.episodeUUIDsToAutoDownload(
+                from: DataManager.sharedManager.allUpNextPlaylistEpisodes(),
+                limit: Settings.upNextAutoDownloadLimit()
+            )
+            for episodeUUID in episodeUUIDs {
+                guard let episode = DataManager.sharedManager.findBaseEpisode(uuid: episodeUUID) else { continue }
                 self.autoDownloadIfRequired(episode: episode)
             }
         }
+    }
+
+    static func episodeUUIDsToAutoDownload(from queue: [PlaylistEpisode], limit: UpNextAutoDownloadLimit) -> [String] {
+        let episodes = limit.episodeCount.map { queue.prefix($0) } ?? queue[...]
+        return episodes.map(\.episodeUuid)
     }
 
     private func autoDownloadIfRequired(episode: BaseEpisode) {

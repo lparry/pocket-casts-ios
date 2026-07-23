@@ -39,4 +39,11 @@ final class SettingsTests: XCTestCase {
 
         XCTAssertEqual(defaultPlayerActions, Settings.playerActions(), "Player actions should include changes from update")
     }
+
+    func testUpNextAutoDownloadLimitDefaultsToEntireQueue() {
+        UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextLimitKey)
+        defer { UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextLimitKey) }
+
+        XCTAssertEqual(Settings.upNextAutoDownloadLimit(), .entireQueue)
+    }
 }

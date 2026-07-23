@@ -18,7 +18,7 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
         }
     }
 
-    private enum TableRow { case upNext, podcastAutoDownload, podcastSelection, downloadOnFollow, downloadLimits, filterSelection, onlyOnWifi }
+    private enum TableRow { case upNext, upNextDownloadLimit, podcastAutoDownload, podcastSelection, downloadOnFollow, downloadLimits, filterSelection, onlyOnWifi }
     private let podcastDownloadOffData: [[TableRow]] = [[.upNext], [.podcastAutoDownload], [.filterSelection], [.onlyOnWifi]]
     private let podcastDownloadOnData: [[TableRow]] = [[.upNext], [.podcastAutoDownload, .podcastSelection], [.filterSelection], [.onlyOnWifi]]
 
@@ -99,6 +99,13 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
             cell.cellSwitch.addTarget(self, action: #selector(downloadUpNextToggled(_:)), for: UIControl.Event.valueChanged)
 
             return cell
+        case .upNextDownloadLimit:
+            let cell = tableView.dequeueReusableCell(withIdentifier: DownloadSettingsViewController.disclosureCellId, for: indexPath) as! DisclosureCell
+
+            cell.cellLabel.text = L10n.settingsAutoDownloadsUpNextLimit
+            cell.cellSecondaryLabel.text = Settings.upNextAutoDownloadLimit().localizedDescription
+
+            return cell
         case .podcastAutoDownload:
             let cell = tableView.dequeueReusableCell(withIdentifier: DownloadSettingsViewController.switchCellId, for: indexPath) as! SwitchCell
 
@@ -166,6 +173,17 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
         let row = tableRows()[indexPath.section][indexPath.row]
 
         switch row {
+        case .upNextDownloadLimit:
+            let picker = OptionsPicker(title: L10n.settingsAutoDownloadsUpNextLimit)
+            for limit in UpNextAutoDownloadLimit.allCases {
+                let action = OptionAction(label: limit.localizedDescription, selected: Settings.upNextAutoDownloadLimit() == limit) {
+                    Settings.setUpNextAutoDownloadLimit(limit)
+                    PlaybackManager.shared.queue.refreshList(checkForAutoDownload: true)
+                    tableView.reloadData()
+                }
+                picker.addAction(action: action)
+            }
+            picker.present(from: self)
         case .podcastSelection:
             podcastChooserController = PodcastChooserViewController()
             podcastChooserController?.analyticsSource = .downloads
@@ -263,6 +281,9 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
 
     @objc private func downloadUpNextToggled(_ slider: UISwitch) {
         Settings.setDownloadUpNextEpisodes(slider.isOn)
+        if slider.isOn {
+            PlaybackManager.shared.queue.refreshList(checkForAutoDownload: true)
+        }
 
         settingsTable.reloadData()
     }
@@ -283,6 +304,10 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
             if !autoDownloadPodcastsEnabled {
                 data[1].remove(at: 1)
             }
+        }
+
+        if Settings.downloadUpNextEpisodes() {
+            data[0].append(.upNextDownloadLimit)
         }
 
         return data
@@ -307,5 +332,15 @@ extension AutoDownloadLimit {
         default:
             return L10n.autoDownloadLimitNumberOfEpisodesShow(self.rawValue)
         }
+    }
+}
+
+extension UpNextAutoDownloadLimit {
+    var localizedDescription: String {
+        guard let episodeCount else {
+            return L10n.settingsAutoDownloadsUpNextEntireQueue
+        }
+
+        return L10n.settingsAutoDownloadsUpNextFirstEpisodesFormat(episodeCount.localized())
     }
 }

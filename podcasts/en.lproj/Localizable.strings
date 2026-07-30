@@ -2509,8 +2509,8 @@
 /* Subtitle explaining the toggle to auto download New Episodes. */
 "settings_auto_downloads_subtitle_new_episodes" = "Automatically download new episodes, save episodes from newly followed shows, and manage your storage by setting a limit on how many episodes are saved.";
 
-/* Subtitle explaining how the Up Next auto-download limit behaves. */
-"settings_auto_downloads_subtitle_up_next" = "Download episodes at the front of Up Next. Existing downloads aren't removed when they move outside this range.";
+/* Subtitle explaining how the Up Next auto-download and retention limits behave. */
+"settings_auto_downloads_subtitle_up_next" = "Download episodes at the front of Up Next. Keep downloaded can remove automatically downloaded or cached episodes further back while preserving manual downloads and starred episodes.";
 
 /* Label for choosing how many episodes at the front of Up Next should be automatically downloaded. */
 "settings_auto_downloads_up_next_limit" = "Download ahead";
@@ -2520,6 +2520,15 @@
 
 /* Option to automatically download a limited number of episodes at the front of Up Next. '%1$@' is the episode count. */
 "settings_auto_downloads_up_next_first_episodes_format" = "First %1$@ episodes";
+
+/* Label for choosing the maximum number of auto-downloaded Up Next episodes to retain. */
+"settings_auto_downloads_up_next_retention_limit" = "Keep downloaded";
+
+/* Option to retain all auto-downloaded Up Next episodes. */
+"settings_auto_downloads_up_next_retention_no_limit" = "No limit";
+
+/* Option to retain at most a specified number of auto-downloaded Up Next episodes. '%1$@' is the episode count. */
+"settings_auto_downloads_up_next_retention_episodes_format" = "At most %1$@ episodes";
 
 /* Section Header for selecting the options for setting the app badge based on the user's filters. */
 "settings_badge_filter_header" = "EPISODE FILTER COUNT";

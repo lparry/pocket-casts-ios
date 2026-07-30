@@ -396,13 +396,26 @@ class PlaybackQueue: NSObject {
 
             guard Settings.downloadUpNextEpisodes() else { return }
 
-            let episodeUUIDs = Self.episodeUUIDsToAutoDownload(
-                from: DataManager.sharedManager.allUpNextPlaylistEpisodes(),
-                limit: Settings.upNextAutoDownloadLimit()
-            )
+            let queue = DataManager.sharedManager.allUpNextPlaylistEpisodes()
+            let downloadLimit = Settings.upNextAutoDownloadLimit()
+            let episodeUUIDs = Self.episodeUUIDsToAutoDownload(from: queue, limit: downloadLimit)
             for episodeUUID in episodeUUIDs {
                 guard let episode = DataManager.sharedManager.findBaseEpisode(uuid: episodeUUID) else { continue }
                 self.autoDownloadIfRequired(episode: episode)
+            }
+
+            let resolvedEpisodes = queue.compactMap {
+                DataManager.sharedManager.findBaseEpisode(uuid: $0.episodeUuid)
+            }
+            let retentionLimit = downloadLimit == .entireQueue ? .entireQueue : Settings.upNextAutoDownloadRetentionLimit()
+            let episodeUUIDsToOffload = Self.episodeUUIDsToOffload(
+                from: resolvedEpisodes,
+                protectedUUIDs: Set(episodeUUIDs),
+                currentEpisodeUUID: queue.first?.episodeUuid,
+                retentionLimit: retentionLimit
+            )
+            for episodeUUID in episodeUUIDsToOffload {
+                self.offloadAutomaticallyStoredEpisode(uuid: episodeUUID)
             }
         }
     }
@@ -412,6 +425,36 @@ class PlaybackQueue: NSObject {
         return episodes.map(\.episodeUuid)
     }
 
+    static func episodeUUIDsToOffload(from episodes: [BaseEpisode], protectedUUIDs: Set<String>, currentEpisodeUUID: String?, retentionLimit: UpNextAutoDownloadLimit) -> [String] {
+        guard let retentionCount = retentionLimit.episodeCount else { return [] }
+
+        let automaticallyStoredEpisodes = episodes.filter {
+            let isCompletedStreamingBuffer = $0.episodeStatus == DownloadStatus.downloadedForStreaming.rawValue
+            let isPromotedStreamingBuffer = $0.episodeStatus == DownloadStatus.downloaded.rawValue &&
+                $0.autoDownloadStatus == AutoDownloadStatus.playerDownloadedForStreaming.rawValue
+            let isAutomaticDownload = $0.autoDownloadStatus == AutoDownloadStatus.autoDownloaded.rawValue &&
+                ($0.episodeStatus == DownloadStatus.downloaded.rawValue ||
+                    $0.episodeStatus == DownloadStatus.queued.rawValue ||
+                    $0.episodeStatus == DownloadStatus.downloading.rawValue ||
+                    $0.episodeStatus == DownloadStatus.waitingForWifi.rawValue)
+
+            return isCompletedStreamingBuffer || isPromotedStreamingBuffer || isAutomaticDownload
+        }
+        let excessCount = max(0, automaticallyStoredEpisodes.count - retentionCount)
+        guard excessCount > 0 else { return [] }
+
+        let candidates = automaticallyStoredEpisodes.reversed().compactMap { episode -> String? in
+            guard episode.uuid != currentEpisodeUUID,
+                  !protectedUUIDs.contains(episode.uuid),
+                  !episode.keepEpisode else {
+                return nil
+            }
+
+            return episode.uuid
+        }
+        return Array(candidates.prefix(excessCount))
+    }
+
     private func autoDownloadIfRequired(episode: BaseEpisode) {
         if !Settings.downloadUpNextEpisodes() || episode.queued() || episode.downloaded(pathFinder: DownloadManager.shared) { return }
 
@@ -419,6 +462,31 @@ class PlaybackQueue: NSObject {
             DownloadManager.shared.addToQueue(episodeUuid: episode.uuid, autoDownloadStatus: .autoDownloaded)
         } else {
             DownloadManager.shared.queueForLaterDownload(episodeUuid: episode.uuid, fireNotification: true, autoDownloadStatus: .autoDownloaded)
+        }
+    }
+
+    private func offloadAutomaticallyStoredEpisode(uuid: String) {
+        guard let episode = DataManager.sharedManager.findBaseEpisode(uuid: uuid), !episode.keepEpisode else {
+            return
+        }
+
+        let isCompletedDownload = episode.episodeStatus == DownloadStatus.downloaded.rawValue &&
+            episode.autoDownloadStatus == AutoDownloadStatus.autoDownloaded.rawValue
+        let isCompletedStreamingBuffer = episode.episodeStatus == DownloadStatus.downloadedForStreaming.rawValue
+        let isPromotedStreamingBuffer = episode.episodeStatus == DownloadStatus.downloaded.rawValue &&
+            episode.autoDownloadStatus == AutoDownloadStatus.playerDownloadedForStreaming.rawValue
+        let isActiveAutomaticDownload = episode.autoDownloadStatus == AutoDownloadStatus.autoDownloaded.rawValue &&
+            (episode.queued() || episode.downloading() || episode.waitingForWifi())
+        guard isCompletedDownload || isCompletedStreamingBuffer || isPromotedStreamingBuffer || isActiveAutomaticDownload else {
+            return
+        }
+
+        FileLog.shared.addMessage("PlaybackQueue: offloading automatically stored episode \(episode.displayableTitle())")
+        if isCompletedDownload || isCompletedStreamingBuffer || isPromotedStreamingBuffer {
+            EpisodeManager.deleteDownloadedFiles(episode: episode)
+            NotificationCenter.postOnMainThread(notification: Constants.Notifications.episodeDownloadStatusChanged, object: episode.uuid)
+        } else if isActiveAutomaticDownload {
+            DownloadManager.shared.removeFromQueue(episode: episode, fireNotification: true, userInitiated: true)
         }
     }
     #endif

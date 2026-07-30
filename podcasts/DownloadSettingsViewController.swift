@@ -18,7 +18,7 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
         }
     }
 
-    private enum TableRow { case upNext, upNextDownloadLimit, podcastAutoDownload, podcastSelection, downloadOnFollow, downloadLimits, filterSelection, onlyOnWifi }
+    private enum TableRow { case upNext, upNextDownloadLimit, upNextRetentionLimit, podcastAutoDownload, podcastSelection, downloadOnFollow, downloadLimits, filterSelection, onlyOnWifi }
     private let podcastDownloadOffData: [[TableRow]] = [[.upNext], [.podcastAutoDownload], [.filterSelection], [.onlyOnWifi]]
     private let podcastDownloadOnData: [[TableRow]] = [[.upNext], [.podcastAutoDownload, .podcastSelection], [.filterSelection], [.onlyOnWifi]]
 
@@ -106,6 +106,13 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
             cell.cellSecondaryLabel.text = Settings.upNextAutoDownloadLimit().localizedDescription
 
             return cell
+        case .upNextRetentionLimit:
+            let cell = tableView.dequeueReusableCell(withIdentifier: DownloadSettingsViewController.disclosureCellId, for: indexPath) as! DisclosureCell
+
+            cell.cellLabel.text = L10n.settingsAutoDownloadsUpNextRetentionLimit
+            cell.cellSecondaryLabel.text = Settings.upNextAutoDownloadRetentionLimit().localizedRetentionDescription
+
+            return cell
         case .podcastAutoDownload:
             let cell = tableView.dequeueReusableCell(withIdentifier: DownloadSettingsViewController.switchCellId, for: indexPath) as! SwitchCell
 
@@ -178,6 +185,25 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
             for limit in UpNextAutoDownloadLimit.allCases {
                 let action = OptionAction(label: limit.localizedDescription, selected: Settings.upNextAutoDownloadLimit() == limit) {
                     Settings.setUpNextAutoDownloadLimit(limit)
+                    PlaybackManager.shared.queue.refreshList(checkForAutoDownload: true)
+                    tableView.reloadData()
+                }
+                picker.addAction(action: action)
+            }
+            picker.present(from: self)
+        case .upNextRetentionLimit:
+            let picker = OptionsPicker(title: L10n.settingsAutoDownloadsUpNextRetentionLimit)
+            let downloadCount = Settings.upNextAutoDownloadLimit().episodeCount
+            let availableLimits = UpNextAutoDownloadLimit.allCases.filter { limit in
+                guard let retentionCount = limit.episodeCount, let downloadCount else {
+                    return true
+                }
+
+                return retentionCount >= downloadCount
+            }
+            for limit in availableLimits {
+                let action = OptionAction(label: limit.localizedRetentionDescription, selected: Settings.upNextAutoDownloadRetentionLimit() == limit) {
+                    Settings.setUpNextAutoDownloadRetentionLimit(limit)
                     PlaybackManager.shared.queue.refreshList(checkForAutoDownload: true)
                     tableView.reloadData()
                 }
@@ -308,6 +334,9 @@ class DownloadSettingsViewController: PCViewController, UITableViewDataSource, U
 
         if Settings.downloadUpNextEpisodes() {
             data[0].append(.upNextDownloadLimit)
+            if Settings.upNextAutoDownloadLimit() != .entireQueue {
+                data[0].append(.upNextRetentionLimit)
+            }
         }
 
         return data
@@ -342,5 +371,13 @@ extension UpNextAutoDownloadLimit {
         }
 
         return L10n.settingsAutoDownloadsUpNextFirstEpisodesFormat(episodeCount.localized())
+    }
+
+    var localizedRetentionDescription: String {
+        guard let episodeCount else {
+            return L10n.settingsAutoDownloadsUpNextRetentionNoLimit
+        }
+
+        return L10n.settingsAutoDownloadsUpNextRetentionEpisodesFormat(episodeCount.localized())
     }
 }

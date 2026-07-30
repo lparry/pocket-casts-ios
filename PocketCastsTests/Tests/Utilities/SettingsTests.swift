@@ -46,4 +46,23 @@ final class SettingsTests: XCTestCase {
 
         XCTAssertEqual(Settings.upNextAutoDownloadLimit(), .entireQueue)
     }
+
+    func testUpNextAutoDownloadRetentionLimitDefaultsToNoLimit() {
+        UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextRetentionLimitKey)
+        defer { UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextRetentionLimitKey) }
+
+        XCTAssertEqual(Settings.upNextAutoDownloadRetentionLimit(), .entireQueue)
+    }
+
+    func testUpNextAutoDownloadLimitRaisesLowerRetentionLimit() {
+        UserDefaults.standard.set(UpNextAutoDownloadLimit.ten.rawValue, forKey: Settings.autoDownloadUpNextRetentionLimitKey)
+        defer {
+            UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextLimitKey)
+            UserDefaults.standard.removeObject(forKey: Settings.autoDownloadUpNextRetentionLimitKey)
+        }
+
+        Settings.setUpNextAutoDownloadLimit(.twenty)
+
+        XCTAssertEqual(Settings.upNextAutoDownloadRetentionLimit(), .twenty)
+    }
 }

@@ -79,6 +79,7 @@ class Settings: NSObject {
 
     private static let autoDownloadUpNext = "SJAutoDownloadUpNext"
     static let autoDownloadUpNextLimitKey = "SJAutoDownloadUpNextLimit"
+    static let autoDownloadUpNextRetentionLimitKey = "SJAutoDownloadUpNextRetentionLimit"
 
     static var downloadUpNextEpisodes: Bool {
         get {
@@ -96,7 +97,23 @@ class Settings: NSObject {
 
     class func setUpNextAutoDownloadLimit(_ limit: UpNextAutoDownloadLimit) {
         UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextLimitKey)
+
+        if let episodeCount = limit.episodeCount,
+           let retentionCount = upNextAutoDownloadRetentionLimit().episodeCount,
+           retentionCount < episodeCount {
+            UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextRetentionLimitKey)
+        }
+
         trackValueChanged(.settingsAutoDownloadUpNextLimitChanged, value: limit.analyticsValue)
+    }
+
+    class func upNextAutoDownloadRetentionLimit() -> UpNextAutoDownloadLimit {
+        UpNextAutoDownloadLimit(rawValue: UserDefaults.standard.integer(forKey: autoDownloadUpNextRetentionLimitKey)) ?? .entireQueue
+    }
+
+    class func setUpNextAutoDownloadRetentionLimit(_ limit: UpNextAutoDownloadLimit) {
+        UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextRetentionLimitKey)
+        trackValueChanged(.settingsAutoDownloadUpNextRetentionLimitChanged, value: limit.analyticsValue)
     }
 
     // MARK: - Mobile Data

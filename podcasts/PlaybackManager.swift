@@ -2467,6 +2467,8 @@ class PlaybackManager: ServerPlaybackDelegate {
     // MARK: - Downloading a streamed episode check
 
     @objc private func handleEpisodeDidDownload(_ notification: Notification) {
+        queue.refreshList(checkForAutoDownload: true)
+
         guard let playingEpisode = currentEpisode, let uuid = notification.object as? String else { return }
 
         if uuid != playingEpisode.uuid { return } // download isn't the episode we're playing

@@ -299,18 +299,25 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         }
     }
 
-    func seekTo(_ time: TimeInterval, completion: (() -> Void)?) {
+    func seekTo(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?) {
         let adjustedTime = fmax(0.1, time)
 
         let timeToSeekTo = CMTimeMake(value: Int64(adjustedTime * 100), timescale: 100)
         let tolerance = CMTime.zero // in testing setting this to 1 second wasn't honoured and it would sometimes be 10 seconds out. So go for accuracy over seek speed here
 
-        player?.seek(to: timeToSeekTo, toleranceBefore: tolerance, toleranceAfter: tolerance, completionHandler: { finished in
+        guard let player else {
+            failure?()
+            return
+        }
+
+        player.seek(to: timeToSeekTo, toleranceBefore: tolerance, toleranceAfter: tolerance, completionHandler: { finished in
             if finished {
                 if !self.playing(), self.shouldKeepPlaying {
                     self.play(completion: nil)
                 }
                 completion?()
+            } else {
+                failure?()
             }
         })
     }

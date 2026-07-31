@@ -83,10 +83,13 @@ class GoogleCastPlayer: PlaybackProtocol {
         // we don't support this currently
     }
 
-    func seekTo(_ time: TimeInterval, completion: (() -> Void)?) {
-        castManager.seekToTime(time)
+    func seekTo(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?) {
+        guard castManager.canSeekToTime() else {
+            failure?()
+            return
+        }
 
-        completion?()
+        castManager.seekToTime(time, completion: completion, failure: failure)
     }
 
     func currentTime() -> TimeInterval {

@@ -16,6 +16,7 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
     private var episodeToPlayOnConnect: BaseEpisode?
 
     private var playbackStart: GoogleCastStartupObserver?
+    private var seekRequest: GoogleCastRequestObserver?
 
     private var pausing = false
     private var bufferingInitialPartOfEpisode = false
@@ -159,6 +160,8 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
     func cancelPlaybackStart() {
         playbackStart?.cancel()
         playbackStart = nil
+        seekRequest?.cancel()
+        seekRequest = nil
     }
 
     private func observeStartup(client: GCKRemoteMediaClient, episodeUuid: String, completion: (() -> Void)?, failure: (() -> Void)?, send: () -> GCKRequest) {
@@ -286,14 +289,21 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
         return false
     }
 
-    func seekToTime(_ time: TimeInterval) {
-        guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
-
-        if !canSeekToTime() { return }
+    func seekToTime(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?) {
+        guard let client = GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient,
+              canSeekToTime() else {
+            failure?()
+            return
+        }
 
         let seekOptions = GCKMediaSeekOptions()
         seekOptions.interval = time
-        session.remoteMediaClient?.seek(with: seekOptions)
+        seekRequest?.cancel()
+        let observer = GoogleCastRequestObserver(completion: completion, failure: failure)
+        seekRequest = observer
+        observer.send {
+            client.seek(with: seekOptions)
+        }
     }
 
     func streamPosition() -> TimeInterval {
@@ -429,6 +439,49 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
     private func stopMonitoring(_ castSession: GCKCastSession) {
         cancelPlaybackStart()
         castSession.remoteMediaClient?.remove(self)
+    }
+}
+
+/// Keeps a Cast SDK command alive until the receiver acknowledges or rejects it.
+final class GoogleCastRequestObserver: NSObject, GCKRequestDelegate {
+    private let request: PlaybackStartRequest
+    private var command: GCKRequest?
+
+    init(completion: (() -> Void)?, failure: (() -> Void)?) {
+        request = PlaybackStartRequest(completion: completion, failure: failure)
+        super.init()
+        request.whenResolved { [weak self] in self?.detach() }
+    }
+
+    func send(_ send: () -> GCKRequest) {
+        let command = send()
+        self.command = command
+        command.delegate = self
+        if !command.inProgress {
+            cancel()
+        }
+    }
+
+    func cancel() {
+        request.finish(success: false)
+    }
+
+    func requestDidComplete(_ request: GCKRequest) {
+        self.request.finish(success: true)
+    }
+
+    func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+        cancel()
+    }
+
+    func request(_ request: GCKRequest, didAbortWith abortReason: GCKRequestAbortReason) {
+        cancel()
+    }
+
+    private func detach() {
+        command?.delegate = nil
+        if command?.inProgress == true { command?.cancel() }
+        command = nil
     }
 }
 

@@ -11,7 +11,7 @@ import PocketCastsDataModel
     func playbackRate() -> Double
     func setPlaybackRate(_ rate: Double)
 
-    func seekTo(_ time: TimeInterval, completion: (() -> Void)?)
+    func seekTo(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?)
     func currentTime() -> TimeInterval
     func duration() -> TimeInterval
 
@@ -38,10 +38,36 @@ import PocketCastsDataModel
 
     var currentAudioLevel: Float { get }
 }
-
 extension PlaybackProtocol {
     func play(completion: (() -> Void)? = nil) {
         play(completion: completion, failure: nil)
+    }
+
+    func seekTo(_ time: TimeInterval, completion: (() -> Void)?) {
+        seekTo(time, completion: completion, failure: nil)
+    }
+}
+
+struct PlaybackSeekContext {
+    enum CompletionKind: Equatable {
+        case sameEpisode
+        case completedEpisode
+        case invalid
+    }
+
+    let episodeUuid: String
+    let episodeDuration: TimeInterval
+    let playbackGeneration: UUID
+    let targetTime: TimeInterval
+
+    func completionKind(currentEpisodeUuid: String?, playbackGeneration: UUID) -> CompletionKind {
+        if playbackGeneration == self.playbackGeneration, currentEpisodeUuid == episodeUuid {
+            return .sameEpisode
+        }
+        if targetTime >= episodeDuration, currentEpisodeUuid != episodeUuid {
+            return .completedEpisode
+        }
+        return .invalid
     }
 }
 

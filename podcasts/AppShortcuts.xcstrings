@@ -231,6 +231,27 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：播放推荐剧集" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：播放推薦的劇集" } }
       }
+    },
+    "${applicationName}: Next chapter" : {
+      "comment" : "Phrase for running the Next Chapter App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítol següent" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Nächstes Kapitel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Next chapter" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo siguiente" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Próximo capítulo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre suivant" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre suivant" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capitolo successivo" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で次のチャプター" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Volgend hoofdstuk" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Próximo capítulo" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Следующая глава" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Nästa kapitel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：下一章" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：下一章" } }
+      }
     }
   },
   "version" : "1.0"

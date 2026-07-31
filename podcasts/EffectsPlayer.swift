@@ -254,24 +254,37 @@ class EffectsPlayer: PlaybackProtocol, Hashable {
         }
     }
 
-    func seekTo(_ time: TimeInterval, completion: (() -> Void)?) {
-        guard let readOperation = audioReadTask else { return }
+    func seekTo(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?) {
+        guard let readOperation = audioReadTask else {
+            failure?()
+            return
+        }
 
         serialSeekQueue.async { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                failure?()
+                return
+            }
 
             lastSeekTime = max(0.1, time)
             seeking = true
             readOperation.seekTo(time, completion: { [weak self] seekedToEnd in
-                if !seekedToEnd {
-                    completion?()
-                } else if !(self?.playBufferManager?.haveNotifiedPlayer.value ?? false) {
-                    self?.playBufferManager?.haveNotifiedPlayer.value = true
-                    FileLog.shared.addMessage("EffectsPlayer seeked passed end of episode, calling finished playing")
-                    PlaybackManager.shared.playerDidFinishPlayingEpisode()
+                guard let self else {
+                    failure?()
+                    return
                 }
 
-                self?.seeking = false
+                if !seekedToEnd {
+                    completion?()
+                } else if !(self.playBufferManager?.haveNotifiedPlayer.value ?? false) {
+                    self.playBufferManager?.haveNotifiedPlayer.value = true
+                    FileLog.shared.addMessage("EffectsPlayer seeked passed end of episode, calling finished playing")
+                    PlaybackManager.shared.playerDidFinishPlayingEpisode(completion: completion, failure: failure)
+                } else {
+                    completion?()
+                }
+
+                self.seeking = false
             })
         }
     }

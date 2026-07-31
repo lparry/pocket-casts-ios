@@ -429,6 +429,48 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
         XCTAssertEqual(suggestedEpisodePlayer.startedEpisodeUUIDs, ["episode-uuid", "episode-uuid"])
         XCTAssertEqual(fetchedPodcastUUIDs, ["podcast-uuid"])
     }
+
+    @MainActor
+    func testNextChapterPerformsNextChapterAction() async throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try await NextChapterIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.nextChapter])
+    }
+
+    @MainActor
+    func testNextChapterReportsUnavailableAction() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(result: .unavailable)
+
+        do {
+            try await NextChapterIntent().perform(using: performer)
+            XCTFail("Expected Next Chapter to report an unavailable action")
+        } catch {
+            XCTAssertEqual(error as? NextChapterIntentError, .unavailable)
+        }
+        XCTAssertEqual(performer.performedActions, [.nextChapter])
+    }
+
+    @MainActor
+    func testNextChapterWaitsForSeekAndPlayback() async {
+        let chapterPlayer = RecordingFixedSiriShortcutNextChapterPlayer(playbackStarted: true)
+
+        let started = await SiriShortcutsManager.shared.skipToNextChapter(using: chapterPlayer)
+
+        XCTAssertEqual(started, .success)
+        XCTAssertEqual(chapterPlayer.startNextChapterCallCount, 1)
+    }
+
+    @MainActor
+    func testNextChapterReportsSeekOrPlaybackFailure() async {
+        let chapterPlayer = RecordingFixedSiriShortcutNextChapterPlayer(playbackStarted: false)
+
+        let started = await SiriShortcutsManager.shared.skipToNextChapter(using: chapterPlayer)
+
+        XCTAssertEqual(started, .unavailable)
+        XCTAssertEqual(chapterPlayer.startNextChapterCallCount, 1)
+    }
 }
 
 @MainActor
@@ -508,6 +550,21 @@ private final class RecordingFixedSiriShortcutSuggestedEpisodePlayer: FixedSiriS
     func startSuggestedEpisode(uuid: String) async -> FixedSiriShortcutSuggestedEpisodePlaybackResult {
         startedEpisodeUUIDs.append(uuid)
         return results.isEmpty ? .notFound : results.removeFirst()
+    }
+}
+
+@MainActor
+private final class RecordingFixedSiriShortcutNextChapterPlayer: FixedSiriShortcutNextChapterPlaying {
+    private let playbackStarted: Bool
+    private(set) var startNextChapterCallCount = 0
+
+    init(playbackStarted: Bool) {
+        self.playbackStarted = playbackStarted
+    }
+
+    func startNextChapter() async -> FixedSiriShortcutActionResult {
+        startNextChapterCallCount += 1
+        return playbackStarted ? .success : .unavailable
     }
 }
 
@@ -615,6 +672,62 @@ final class PlaybackStartupTests: XCTestCase {
         observer.cancel()
         XCTAssertEqual(failures, 1)
         XCTAssertEqual(client.listenerCount, 0)
+    }
+
+    func testCastSeekWaitsForSDKAcknowledgement() {
+        var results: [Bool] = []
+        let observer = GoogleCastRequestObserver(completion: { results.append(true) }, failure: { results.append(false) })
+        let command = GCKRequest.application()
+
+        observer.send { command }
+        XCTAssertTrue(results.isEmpty)
+        command.complete()
+        XCTAssertEqual(results, [true])
+    }
+
+    func testCastSeekFailureRejectsLateAcknowledgement() {
+        var results: [Bool] = []
+        let observer = GoogleCastRequestObserver(completion: { results.append(true) }, failure: { results.append(false) })
+        let command = GCKRequest.application()
+
+        observer.send { command }
+        command.abort(with: .cancelled)
+        observer.requestDidComplete(command)
+        XCTAssertEqual(results, [false])
+    }
+
+    func testEndOfEpisodeTransitionIsAcceptedButCancellationIsNot() {
+        let originalGeneration = UUID()
+        let context = PlaybackSeekContext(
+            episodeUuid: "current",
+            episodeDuration: 100,
+            playbackGeneration: originalGeneration,
+            targetTime: 100
+        )
+
+        XCTAssertEqual(
+            context.completionKind(currentEpisodeUuid: "next", playbackGeneration: UUID()),
+            .completedEpisode
+        )
+        XCTAssertEqual(
+            context.completionKind(currentEpisodeUuid: "current", playbackGeneration: UUID()),
+            .invalid
+        )
+    }
+
+    func testEndOfEpisodeWithEmptyQueueIsAcceptedWithoutGenerationChange() {
+        let generation = UUID()
+        let context = PlaybackSeekContext(
+            episodeUuid: "current",
+            episodeDuration: 100,
+            playbackGeneration: generation,
+            targetTime: 100
+        )
+
+        XCTAssertEqual(
+            context.completionKind(currentEpisodeUuid: nil, playbackGeneration: generation),
+            .completedEpisode
+        )
     }
 
     @MainActor

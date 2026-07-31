@@ -357,6 +357,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目前没有可播放的推荐单集。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前沒有可播放的推薦單集。" } }
       }
+    },
+    "siri_shortcut_next_chapter_description" : {
+      "comment" : "Description for the App Intent that skips to the next chapter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítol següent a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Springt zum nächsten Kapitel in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skips to the next chapter in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo siguiente en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Salta al próximo capítulo en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre suivant dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre suivant dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Passa al capitolo successivo in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで次のチャプターに移動します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Gaat naar het volgende hoofdstuk in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pula para o próximo capítulo no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переходит к следующей главе в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Hoppar till nästa kapitel i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到下一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到下一章。" } }
+      }
+    },
+    "siri_shortcut_next_chapter_unavailable_error" : {
+      "comment" : "Error shown when the Next Chapter App Intent cannot skip to another chapter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No es pot saltar al capítol següent." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zum nächsten Kapitel kann nicht gesprungen werden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to skip to the next chapter." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se puede saltar al capítulo siguiente." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No se puede saltar al capítulo siguiente." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de passer au chapitre suivant." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de passer au chapitre suivant." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Impossibile passare al capitolo successivo." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "次のチャプターにスキップできません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Kan niet naar het volgende hoofdstuk gaan." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não foi possível pular para o próximo capítulo." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Не удалось перейти к следующей главе." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det gick inte att hoppa till nästa kapitel." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法跳到下一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法跳到下一章。" } }
+      }
     }
   },
   "version" : "1.0"

@@ -77,5 +77,15 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "sparkles"
         )
+        AppShortcut(
+            intent: NextChapterIntent(),
+            phrases: ["\(.applicationName): Next chapter"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_next_chapter",
+                defaultValue: "Next chapter",
+                table: "Localizable"
+            ),
+            systemImageName: "forward.end.fill"
+        )
     }
 }

@@ -393,23 +393,97 @@ class SiriShortcutsManager: CustomObserver {
 
     func playSuggested() -> INPlayMediaIntentResponseCode {
         AnalyticsHelper.siriSurpriseMe()
-        let recommendationHelper = RecommendationHelper()
-        guard let episodeInfo = recommendationHelper.recommendEpisode() else {
+        guard let episodeInfo = RecommendationHelper().recommendEpisode() else {
             return INPlayMediaIntentResponseCode.failureRequiringAppLaunch
         }
 
-        if let episode = DataManager.sharedManager.findEpisode(uuid: episodeInfo.uuid) {
-            AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
-            PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
-        } else {
-            ServerPodcastManager.shared.addFromUuid(podcastUuid: episodeInfo.podcastUuid, subscribe: false, completion: { [weak self] success in
-                if let episode = DataManager.sharedManager.findEpisode(uuid: episodeInfo.uuid), success {
-                    AnalyticsPlaybackHelper.shared.currentSource = self?.analyticsSource
-                    PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
-                }
-            })
+        if playRecommendedEpisode(uuid: episodeInfo.uuid) {
+            return INPlayMediaIntentResponseCode.success
+        }
+
+        ServerPodcastManager.shared.addFromUuid(podcastUuid: episodeInfo.podcastUuid, subscribe: false) { [weak self] success in
+            _ = success ? self?.playRecommendedEpisode(uuid: episodeInfo.uuid) : false
         }
         return INPlayMediaIntentResponseCode.success
+    }
+
+    private func playRecommendedEpisode(uuid: String) -> Bool {
+        guard let episode = DataManager.sharedManager.findEpisode(uuid: uuid) else { return false }
+
+        AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+        PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
+        return true
+    }
+
+    @MainActor
+    func playSuggestedAsync(
+        using suggestedEpisodePlayer: any FixedSiriShortcutSuggestedEpisodePlaying = PlaybackManager.shared,
+        recommendEpisode: () async -> Episode? = {
+            await RecommendationHelper().recommendEpisodeAsync(timeout: BackgroundPlayback.current?.remainingTime)
+        }
+    ) async -> FixedSiriShortcutActionResult {
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        AnalyticsHelper.siriSurpriseMe()
+        let episodeInfo = await recommendEpisode()
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        guard let episodeInfo else {
+            return .unavailable
+        }
+
+        return await playSuggestedEpisode(
+            episodeUuid: episodeInfo.uuid,
+            podcastUuid: episodeInfo.podcastUuid,
+            using: suggestedEpisodePlayer,
+            fetchPodcast: { podcastUuid in
+                await withCheckedContinuation { continuation in
+                    ServerPodcastManager.shared.addFromUuid(podcastUuid: podcastUuid, subscribe: false) { success in
+                        continuation.resume(returning: success)
+                    }
+                }
+            }
+        )
+    }
+
+    @MainActor
+    func playSuggestedEpisode(
+        episodeUuid: String,
+        podcastUuid: String,
+        using suggestedEpisodePlayer: any FixedSiriShortcutSuggestedEpisodePlaying,
+        fetchPodcast: (String) async -> Bool
+    ) async -> FixedSiriShortcutActionResult {
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        let firstResult = await playRecommendedEpisodeAsync(uuid: episodeUuid, using: suggestedEpisodePlayer)
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        switch firstResult {
+        case .success:
+            return .success
+        case .playbackFailed:
+            return .playbackFailed
+        case .notFound:
+            break
+        }
+
+        guard BackgroundPlayback.canContinue, await fetchPodcast(podcastUuid), BackgroundPlayback.canContinue else { return .unavailable }
+
+        let fetchedResult = await playRecommendedEpisodeAsync(uuid: episodeUuid, using: suggestedEpisodePlayer)
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        switch fetchedResult {
+        case .success:
+            return .success
+        case .notFound:
+            return .unavailable
+        case .playbackFailed:
+            return .playbackFailed
+        }
+    }
+
+    @MainActor
+    func playRecommendedEpisodeAsync(
+        uuid: String,
+        using suggestedEpisodePlayer: any FixedSiriShortcutSuggestedEpisodePlaying
+    ) async -> FixedSiriShortcutSuggestedEpisodePlaybackResult {
+        guard BackgroundPlayback.canContinue else { return .playbackFailed }
+        return await suggestedEpisodePlayer.startSuggestedEpisode(uuid: uuid)
     }
 
     func skipToNextChapter() -> INPlayMediaIntentResponseCode {

@@ -242,6 +242,193 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
         XCTAssertEqual(started, .playbackFailed)
         XCTAssertEqual(upNextPlayer.startNextEpisodeCallCount, 1)
     }
+
+    @MainActor
+    func testExpiredBackgroundSuggestionDoesNotRequestOrStartPlayback() async {
+        let player = RecordingFixedSiriShortcutSuggestedEpisodePlayer(playbackStarted: true)
+        let result = await BackgroundPlayback.$current.withValue(BackgroundPlayback(timeout: 0)) {
+            await SiriShortcutsManager.shared.playSuggestedAsync(using: player, recommendEpisode: {
+                XCTFail("Expired intent requested a recommendation")
+                return nil
+            })
+        }
+        XCTAssertEqual(result, .unavailable)
+        XCTAssertTrue(player.startedEpisodeUUIDs.isEmpty)
+    }
+
+    @MainActor
+    func testCancelledRecommendationCannotStartReturnedEpisode() async {
+        let requested = expectation(description: "recommendation pending")
+        var pending: CheckedContinuation<Episode?, Never>?
+        let player = RecordingFixedSiriShortcutSuggestedEpisodePlayer(playbackStarted: true)
+        let task = Task {
+            await SiriShortcutsManager.shared.playSuggestedAsync(using: player, recommendEpisode: {
+                await withCheckedContinuation { continuation in
+                    pending = continuation
+                    requested.fulfill()
+                }
+            })
+        }
+        await fulfillment(of: [requested], timeout: 1)
+        task.cancel()
+        let episode = Episode()
+        episode.uuid = "late-episode"
+        episode.podcastUuid = "podcast"
+        pending?.resume(returning: episode)
+        let result = await task.value
+        XCTAssertEqual(result, .unavailable)
+        XCTAssertTrue(player.startedEpisodeUUIDs.isEmpty)
+    }
+
+    @MainActor
+    func testCancelledPodcastFetchCannotRetryPlayback() async {
+        let requested = expectation(description: "podcast pending")
+        var pending: CheckedContinuation<Bool, Never>?
+        let player = RecordingFixedSiriShortcutSuggestedEpisodePlayer(results: [.notFound, .success])
+        let task = Task {
+            await SiriShortcutsManager.shared.playSuggestedEpisode(episodeUuid: "episode", podcastUuid: "podcast", using: player, fetchPodcast: { _ in
+                await withCheckedContinuation { continuation in
+                    pending = continuation
+                    requested.fulfill()
+                }
+            })
+        }
+        await fulfillment(of: [requested], timeout: 1)
+        task.cancel()
+        pending?.resume(returning: true)
+        let result = await task.value
+        XCTAssertEqual(result, .unavailable)
+        XCTAssertEqual(player.startedEpisodeUUIDs, ["episode"])
+    }
+
+    @MainActor
+    func testAlreadyCancelledSuggestionDoesNotRequestRecommendation() async {
+        let player = RecordingFixedSiriShortcutSuggestedEpisodePlayer(playbackStarted: true)
+        let task = Task { @MainActor in
+            await SiriShortcutsManager.shared.playSuggestedAsync(using: player, recommendEpisode: {
+                XCTFail("Cancelled intent requested a recommendation")
+                return nil
+            })
+        }
+        task.cancel()
+        let result = await task.value
+        XCTAssertEqual(result, .unavailable)
+        XCTAssertTrue(player.startedEpisodeUUIDs.isEmpty)
+    }
+
+    @MainActor
+    func testPlaySuggestedPerformsPlaySuggestedAction() async throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try await PlaySuggestedIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.playSuggested])
+    }
+
+    @MainActor
+    func testPlaySuggestedRequiresSignInBeforePerformingAction() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        do {
+            try await PlaySuggestedIntent().perform(using: performer, isUserLoggedIn: false)
+            XCTFail("Expected Play Suggested to require sign in")
+        } catch {
+            XCTAssertEqual(error as? PlaySuggestedIntentError, .signInRequired)
+        }
+        XCTAssertTrue(performer.performedActions.isEmpty)
+    }
+
+    @MainActor
+    func testPlaySuggestedFailsWhenNoSuggestionIsAvailable() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(result: .unavailable)
+
+        do {
+            try await PlaySuggestedIntent().perform(using: performer)
+            XCTFail("Expected Play Suggested to fail")
+        } catch {
+            XCTAssertEqual(error as? PlaySuggestedIntentError, .unavailable)
+        }
+        XCTAssertEqual(performer.performedActions, [.playSuggested])
+    }
+
+    @MainActor
+    func testPlaySuggestedReportsPlaybackFailureSeparatelyFromMissingContent() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(result: .playbackFailed)
+
+        do {
+            try await PlaySuggestedIntent().perform(using: performer)
+            XCTFail("Expected Play Suggested to report playback failure")
+        } catch {
+            XCTAssertEqual(error as? PlaySuggestedIntentError, .playbackFailed)
+        }
+        XCTAssertEqual(performer.performedActions, [.playSuggested])
+    }
+
+    @MainActor
+    func testPlaySuggestedWaitsForEpisodeToStart() async {
+        let suggestedEpisodePlayer = RecordingFixedSiriShortcutSuggestedEpisodePlayer(playbackStarted: true)
+
+        let started = await SiriShortcutsManager.shared.playRecommendedEpisodeAsync(
+            uuid: "episode-uuid",
+            using: suggestedEpisodePlayer
+        )
+
+        XCTAssertEqual(started, .success)
+        XCTAssertEqual(suggestedEpisodePlayer.startedEpisodeUUIDs, ["episode-uuid"])
+    }
+
+    @MainActor
+    func testPlaySuggestedReportsPlaybackStartupFailure() async {
+        let suggestedEpisodePlayer = RecordingFixedSiriShortcutSuggestedEpisodePlayer(playbackStarted: false)
+
+        let started = await SiriShortcutsManager.shared.playRecommendedEpisodeAsync(
+            uuid: "episode-uuid",
+            using: suggestedEpisodePlayer
+        )
+
+        XCTAssertEqual(started, .playbackFailed)
+        XCTAssertEqual(suggestedEpisodePlayer.startedEpisodeUUIDs, ["episode-uuid"])
+    }
+
+    @MainActor
+    func testPlaySuggestedDoesNotFetchAfterPlaybackStartupFailure() async {
+        let suggestedEpisodePlayer = RecordingFixedSiriShortcutSuggestedEpisodePlayer(results: [.playbackFailed])
+        var fetchedPodcastUUIDs: [String] = []
+
+        let result = await SiriShortcutsManager.shared.playSuggestedEpisode(
+            episodeUuid: "episode-uuid",
+            podcastUuid: "podcast-uuid",
+            using: suggestedEpisodePlayer,
+            fetchPodcast: { podcastUuid in
+                fetchedPodcastUUIDs.append(podcastUuid)
+                return true
+            }
+        )
+
+        XCTAssertEqual(result, .playbackFailed)
+        XCTAssertEqual(suggestedEpisodePlayer.startedEpisodeUUIDs, ["episode-uuid"])
+        XCTAssertTrue(fetchedPodcastUUIDs.isEmpty)
+    }
+
+    @MainActor
+    func testPlaySuggestedFetchesAndRetriesOnlyWhenEpisodeIsMissing() async {
+        let suggestedEpisodePlayer = RecordingFixedSiriShortcutSuggestedEpisodePlayer(results: [.notFound, .success])
+        var fetchedPodcastUUIDs: [String] = []
+
+        let result = await SiriShortcutsManager.shared.playSuggestedEpisode(
+            episodeUuid: "episode-uuid",
+            podcastUuid: "podcast-uuid",
+            using: suggestedEpisodePlayer,
+            fetchPodcast: { podcastUuid in
+                fetchedPodcastUUIDs.append(podcastUuid)
+                return true
+            }
+        )
+
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(suggestedEpisodePlayer.startedEpisodeUUIDs, ["episode-uuid", "episode-uuid"])
+        XCTAssertEqual(fetchedPodcastUUIDs, ["podcast-uuid"])
+    }
 }
 
 @MainActor
@@ -302,6 +489,25 @@ private final class RecordingFixedSiriShortcutUpNextPlayer: FixedSiriShortcutUpN
     func startNextEpisode() async -> FixedSiriShortcutActionResult {
         startNextEpisodeCallCount += 1
         return playbackStarted ? .success : .playbackFailed
+    }
+}
+
+@MainActor
+private final class RecordingFixedSiriShortcutSuggestedEpisodePlayer: FixedSiriShortcutSuggestedEpisodePlaying {
+    private var results: [FixedSiriShortcutSuggestedEpisodePlaybackResult]
+    private(set) var startedEpisodeUUIDs: [String] = []
+
+    init(playbackStarted: Bool) {
+        results = [playbackStarted ? .success : .playbackFailed]
+    }
+
+    init(results: [FixedSiriShortcutSuggestedEpisodePlaybackResult]) {
+        self.results = results
+    }
+
+    func startSuggestedEpisode(uuid: String) async -> FixedSiriShortcutSuggestedEpisodePlaybackResult {
+        startedEpisodeUUIDs.append(uuid)
+        return results.isEmpty ? .notFound : results.removeFirst()
     }
 }
 

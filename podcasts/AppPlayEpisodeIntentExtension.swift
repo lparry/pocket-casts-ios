@@ -25,9 +25,12 @@ extension PlayEpisodeIntent {
             // Ideally we should use PlaybackActionHelper here
             // However this can potentially trigger an UI and does a lot of other checks
             // that is not as performant as this call.
-            PlaybackManager.shared.load(episode: podcastEpisode, autoPlay: true, overrideUpNext: false)
+            let started = await PlaybackManager.shared.loadAndPlay(episode: podcastEpisode, overrideUpNext: false)
+            if !started {
+                FileLog.shared.addMessage("PlayEpisodeIntent error: playback failed to start")
+            }
             Analytics.track(.widgetInteraction, properties: ["action": "play"])
-            return true
+            return started
         }
     }
 }

@@ -1,15 +1,24 @@
 import AppIntents
+import PocketCastsDataModel
+import PocketCastsServer
 
 enum FixedSiriShortcutAction: Equatable {
     case extendSleepTimer(minutes: Int)
     case resumePlayback
     case pausePlayback
     case playUpNext
+    case playSuggested
 }
 
 enum FixedSiriShortcutActionResult: Equatable {
     case success
     case unavailable
+    case playbackFailed
+}
+
+enum FixedSiriShortcutSuggestedEpisodePlaybackResult: Equatable {
+    case success
+    case notFound
     case playbackFailed
 }
 
@@ -68,6 +77,21 @@ extension PlaybackManager: FixedSiriShortcutUpNextPlaying {
 }
 
 @MainActor
+protocol FixedSiriShortcutSuggestedEpisodePlaying {
+    func startSuggestedEpisode(uuid: String) async -> FixedSiriShortcutSuggestedEpisodePlaybackResult
+}
+
+extension PlaybackManager: FixedSiriShortcutSuggestedEpisodePlaying {
+    func startSuggestedEpisode(uuid: String) async -> FixedSiriShortcutSuggestedEpisodePlaybackResult {
+        guard BackgroundPlayback.canContinue else { return .playbackFailed }
+        guard let episode = DataManager.sharedManager.findEpisode(uuid: uuid) else { return .notFound }
+
+        AnalyticsPlaybackHelper.shared.currentSource = .siri
+        return await loadAndPlay(episode: episode, overrideUpNext: false) ? .success : .playbackFailed
+    }
+}
+
+@MainActor
 protocol FixedSiriShortcutActionPerforming {
     @discardableResult
     func perform(_ action: FixedSiriShortcutAction) async -> FixedSiriShortcutActionResult
@@ -86,6 +110,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
                 return pausePlayback(using: PlaybackManager.shared) == .success ? .success : .unavailable
             case .playUpNext:
                 return await playUpNext(using: PlaybackManager.shared)
+            case .playSuggested:
+                return await playSuggestedAsync()
             }
         }
     }
@@ -156,6 +182,27 @@ enum PlayUpNextIntentError: LocalizedError, Equatable {
             String(
                 localized: "siri_shortcut_play_up_next_no_episode_error",
                 defaultValue: "There’s no next episode in Up Next.",
+                table: "AppIntents"
+            )
+        case .playbackFailed:
+            L10n.podcastDetailsPlaybackError
+        }
+    }
+}
+
+enum PlaySuggestedIntentError: LocalizedError, Equatable {
+    case signInRequired
+    case unavailable
+    case playbackFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .signInRequired:
+            L10n.signInPrompt
+        case .unavailable:
+            String(
+                localized: "siri_shortcut_play_suggested_unavailable_error",
+                defaultValue: "A suggested episode isn’t available right now.",
                 table: "AppIntents"
             )
         case .playbackFailed:
@@ -267,6 +314,59 @@ struct PlayUpNextIntent: AudioPlaybackIntent {
             throw PlayUpNextIntentError.noEpisode
         case .playbackFailed:
             throw PlayUpNextIntentError.playbackFailed
+        }
+    }
+}
+
+struct PlaySuggestedIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_play_suggested_intent_title",
+        defaultValue: "Play a Suggested Episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_play_suggested_description",
+            defaultValue: "Plays a suggested episode in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try await perform(
+            using: SiriShortcutsManager.shared,
+            isUserLoggedIn: SyncManager.isUserLoggedIn()
+        )
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        try await perform(using: actionPerformer, isUserLoggedIn: true)
+    }
+
+    @MainActor
+    func perform(
+        using actionPerformer: any FixedSiriShortcutActionPerforming,
+        isUserLoggedIn: Bool
+    ) async throws {
+        guard isUserLoggedIn else {
+            throw PlaySuggestedIntentError.signInRequired
+        }
+
+        switch await actionPerformer.perform(.playSuggested) {
+        case .success:
+            return
+        case .unavailable:
+            throw PlaySuggestedIntentError.unavailable
+        case .playbackFailed:
+            throw PlaySuggestedIntentError.playbackFailed
         }
     }
 }

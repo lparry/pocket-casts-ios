@@ -189,6 +189,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放下一集" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放下一集" } }
       }
+    },
+    "Play Suggested in ${applicationName}" : {
+      "comment" : "Phrase for running the Play Suggested App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reprodueix Suggerits" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Vorschlag abspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play Suggested in ${applicationName}" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir Sugeridos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir Sugeridos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire une suggestion" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire une suggestion" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: riproduci un suggerimento" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}でおすすめを再生" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: speel een suggestie af" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproduzir sugestão" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: воспроизвести рекомендацию" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: spela förslag" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放推荐内容" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放推薦內容" } }
+      }
+    },
+    "${applicationName}: Play a suggested episode" : {
+      "comment" : "Phrase for running the Play Suggested App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reprodueix un capítol recomanat" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Vorgeschlagene Folge wiedergeben" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Play a suggested episode" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reproducir un episodio recomendado" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reproducir un episodio sugerido" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Lire un épisode suggéré" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Lire un épisode suggéré" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Riproduci un episodio suggerito" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で提案されたエピソードを再生" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Een voorgestelde aflevering afspelen" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reproduzir um episódio sugerido" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Воспроизвести рекомендуемый выпуск" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Spela ett föreslaget avsnitt" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：播放推荐剧集" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：播放推薦的劇集" } }
+      }
     }
   },
   "version" : "1.0"

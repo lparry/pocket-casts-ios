@@ -286,6 +286,22 @@ class PlaybackManager: ServerPlaybackDelegate {
         }
     }
 
+    @MainActor
+    func loadAndPlay(episode: BaseEpisode, overrideUpNext: Bool) async -> Bool {
+        guard BackgroundPlayback.canContinue else { return false }
+        return await BackgroundPlayback.run {
+            await withCheckedContinuation { continuation in
+                load(
+                    episode: episode,
+                    autoPlay: true,
+                    overrideUpNext: overrideUpNext,
+                    completion: { continuation.resume(returning: true) },
+                    failure: { continuation.resume(returning: false) }
+                )
+            }
+        }
+    }
+
     func loadCurrentEpisode() {
         guard let currEpisode = currentEpisode else { return }
         if playerSwitchRequired() {

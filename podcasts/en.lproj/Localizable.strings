@@ -3244,6 +3244,9 @@
 /* Siri shortcut title for playing a suggested podcast */
 "siri_shortcut_play_suggested_podcast_title" = "Playing a suggested episode";
 
+/* Title of the Play Suggested App Intent shown in the Shortcuts app */
+"siri_shortcut_play_suggested_intent_title" = "Play a Suggested Episode";
+
 /* Siri shortcut phrase title for playing a suggested podcast */
 "siri_shortcut_play_suggested_podcast_phrase" = "Play a suggested episode";
 

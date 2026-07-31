@@ -3630,7 +3630,7 @@ Voici un passe invité %1$@ pour Pocket Casts Plus, mon lecteur de podcast préf
     <key>siri_shortcut_resume_phrase</key>
     <string>Reprendre</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Reprise de l’épisode en cours</string>
+    <string>Reprendre l’épisode en cours</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Créer un raccourci vers le podcast</string>
     <key>skip_back</key>

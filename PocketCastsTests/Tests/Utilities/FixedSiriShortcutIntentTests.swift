@@ -28,13 +28,38 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
 
         XCTAssertEqual(performer.performedActions, [.extendSleepTimer(minutes: 5)])
     }
+
+    @MainActor
+    func testResumePlaybackPerformsResumeAction() throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try ResumePlaybackIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.resumePlayback])
+    }
+
+    @MainActor
+    func testResumePlaybackFailsWhenThereIsNoEpisodeToResume() {
+        let performer = RecordingFixedSiriShortcutActionPerformer(actionSucceeded: false)
+
+        XCTAssertThrowsError(try ResumePlaybackIntent().perform(using: performer)) { error in
+            XCTAssertEqual(error as? ResumePlaybackIntentError, .noEpisode)
+        }
+        XCTAssertEqual(performer.performedActions, [.resumePlayback])
+    }
 }
 
 @MainActor
 private final class RecordingFixedSiriShortcutActionPerformer: FixedSiriShortcutActionPerforming {
     private(set) var performedActions: [FixedSiriShortcutAction] = []
+    private let actionSucceeded: Bool
 
-    func perform(_ action: FixedSiriShortcutAction) {
+    init(actionSucceeded: Bool = true) {
+        self.actionSucceeded = actionSucceeded
+    }
+
+    func perform(_ action: FixedSiriShortcutAction) -> Bool {
         performedActions.append(action)
+        return actionSucceeded
     }
 }

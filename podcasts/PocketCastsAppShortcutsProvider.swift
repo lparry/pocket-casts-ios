@@ -28,5 +28,18 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "timer"
         )
+        AppShortcut(
+            intent: ResumePlaybackIntent(),
+            phrases: [
+                "\(.applicationName): Resume",
+                "Continue playing in \(.applicationName)",
+            ],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_resume_title",
+                defaultValue: "Resume Current Episode",
+                table: "Localizable"
+            ),
+            systemImageName: "play.fill"
+        )
     }
 }

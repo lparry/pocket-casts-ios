@@ -3630,7 +3630,7 @@ Aquí tienes un pase de invitado de %1$@ para Pocket Casts Plus, mi reproductor 
     <key>siri_shortcut_resume_phrase</key>
     <string>Reanudar</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Reanudando el episodio actual</string>
+    <string>Reanudar el episodio actual</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Crear acceso directo al podcast</string>
     <key>skip_back</key>

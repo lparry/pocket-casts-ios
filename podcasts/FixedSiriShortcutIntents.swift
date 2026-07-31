@@ -2,18 +2,71 @@ import AppIntents
 
 enum FixedSiriShortcutAction: Equatable {
     case extendSleepTimer(minutes: Int)
+    case resumePlayback
 }
 
 @MainActor
 protocol FixedSiriShortcutActionPerforming {
-    func perform(_ action: FixedSiriShortcutAction)
+    @discardableResult
+    func perform(_ action: FixedSiriShortcutAction) -> Bool
 }
 
 extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
-    func perform(_ action: FixedSiriShortcutAction) {
+    @discardableResult
+    func perform(_ action: FixedSiriShortcutAction) -> Bool {
         switch action {
         case let .extendSleepTimer(minutes):
-            _ = extendSleepTimer(addTime: minutes)
+            return extendSleepTimer(addTime: minutes)
+        case .resumePlayback:
+            return resumePlayback() == .success
+        }
+    }
+}
+
+enum ResumePlaybackIntentError: LocalizedError, Equatable {
+    case noEpisode
+
+    var errorDescription: String? {
+        switch self {
+        case .noEpisode:
+            String(
+                localized: "siri_shortcut_resume_playback_no_episode_error",
+                defaultValue: "There’s no episode to resume.",
+                table: "AppIntents"
+            )
+        }
+    }
+}
+
+struct ResumePlaybackIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_resume_title",
+        defaultValue: "Resume Current Episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_resume_playback_description",
+            defaultValue: "Resumes playback in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) throws {
+        guard actionPerformer.perform(.resumePlayback) else {
+            throw ResumePlaybackIntentError.noEpisode
         }
     }
 }

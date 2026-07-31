@@ -147,6 +147,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分钟" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分鐘" } }
       }
+    },
+    "siri_shortcut_resume_playback_description" : {
+      "comment" : "Description for the App Intent that resumes playback.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Reprèn la reproducció a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Setzt die Wiedergabe in Pocket Casts fort." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resumes playback in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reanuda la reproducción en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Reanuda la reproducción en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Reprend la lecture dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Reprend la lecture dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riprende la riproduzione in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで再生を再開します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Hervat het afspelen in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Retoma a reprodução no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Возобновляет воспроизведение в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Återupptar uppspelningen i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中继续播放。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中繼續播放。" } }
+      }
+    },
+    "siri_shortcut_resume_playback_no_episode_error" : {
+      "comment" : "Error shown when Resume Playback runs without a current episode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap episodi per reprendre." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Es gibt keine Folge zum Fortsetzen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no episode to resume." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio que reanudar." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio que reanudar." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode ne peut être repris." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucun épisode à reprendre." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non ci sono episodi da riprendere." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再開できるエピソードがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is geen aflevering om te hervatten." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há nenhum episódio para retomar." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет выпуска, воспроизведение которого можно возобновить." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget avsnitt att återuppta." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可继续播放的单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有可繼續播放的單集。" } }
+      }
     }
   },
   "version" : "1.0"

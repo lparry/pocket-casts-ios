@@ -3,6 +3,7 @@ import AppIntents
 enum FixedSiriShortcutAction: Equatable {
     case extendSleepTimer(minutes: Int)
     case resumePlayback
+    case pausePlayback
 }
 
 enum FixedSiriShortcutActionResult: Equatable {
@@ -35,6 +36,15 @@ extension PlaybackManager: FixedSiriShortcutPlaybackStarting {
 }
 
 @MainActor
+protocol FixedSiriShortcutPlaybackPausing {
+    var isPlaying: Bool { get }
+
+    func pause(userInitiated: Bool)
+}
+
+extension PlaybackManager: FixedSiriShortcutPlaybackPausing {}
+
+@MainActor
 protocol FixedSiriShortcutActionPerforming {
     @discardableResult
     func perform(_ action: FixedSiriShortcutAction) async -> FixedSiriShortcutActionResult
@@ -49,6 +59,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
                 return extendSleepTimer(addTime: minutes) ? .success : .unavailable
             case .resumePlayback:
                 return await resumePlayback(using: PlaybackManager.shared)
+            case .pausePlayback:
+                return pausePlayback(using: PlaybackManager.shared) == .success ? .success : .unavailable
             }
         }
     }
@@ -138,6 +150,37 @@ struct ResumePlaybackIntent: AudioPlaybackIntent {
         case .playbackFailed:
             throw ResumePlaybackIntentError.playbackFailed
         }
+    }
+}
+
+struct PausePlaybackIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_pause_title",
+        defaultValue: "Pause Current Episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_pause_playback_description",
+            defaultValue: "Pauses playback in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async {
+        await actionPerformer.perform(.pausePlayback)
     }
 }
 

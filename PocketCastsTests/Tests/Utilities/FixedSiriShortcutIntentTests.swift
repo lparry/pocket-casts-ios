@@ -165,6 +165,28 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
 
         await fulfillment(of: [failure, completion], timeout: 1)
     }
+
+    @MainActor
+    func testPausePlaybackPerformsPauseAction() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        await PausePlaybackIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.pausePlayback])
+    }
+
+    @MainActor
+    func testPausePlaybackDoesNotChangePlaybackSourceWhenAlreadyPaused() {
+        let playbackPauser = RecordingFixedSiriShortcutPlaybackPauser(isPlaying: false)
+        AnalyticsPlaybackHelper.shared.currentSource = .unknown
+        defer { AnalyticsPlaybackHelper.shared.currentSource = nil }
+
+        let result = SiriShortcutsManager.shared.pausePlayback(using: playbackPauser)
+
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(AnalyticsPlaybackHelper.shared.currentSource, .unknown)
+        XCTAssertEqual(playbackPauser.pauseCallCount, 1)
+    }
 }
 
 @MainActor
@@ -196,6 +218,20 @@ private final class RecordingFixedSiriShortcutPlaybackStarter: FixedSiriShortcut
     func startPlayback() async -> FixedSiriShortcutActionResult {
         startPlaybackCallCount += 1
         return playbackStarted ? .success : .playbackFailed
+    }
+}
+
+@MainActor
+private final class RecordingFixedSiriShortcutPlaybackPauser: FixedSiriShortcutPlaybackPausing {
+    let isPlaying: Bool
+    private(set) var pauseCallCount = 0
+
+    init(isPlaying: Bool) {
+        self.isPlaying = isPlaying
+    }
+
+    func pause(userInitiated: Bool) {
+        pauseCallCount += 1
     }
 }
 

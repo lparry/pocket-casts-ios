@@ -85,6 +85,27 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延長睡眠計時器" } }
       }
     },
+    "${applicationName}: Pause" : {
+      "comment" : "A phrase for invoking the Pause Playback app shortcut.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Posa en pausa" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pause" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pause" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausar" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Pause" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Suspendre" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Metti in pausa" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で一時停止" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pauzeren" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausar" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Пауза" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausa" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：暂停" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：暫停" } }
+      }
+    },
     "${applicationName}: Resume" : {
       "comment" : "Phrase for running the resume playback App Shortcut. ${applicationName} is the name of the app.",
       "extractionState" : "manual",

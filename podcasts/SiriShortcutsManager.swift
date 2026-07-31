@@ -359,10 +359,15 @@ class SiriShortcutsManager: CustomObserver {
         return INPlayMediaIntentResponseCode.failureNoUnplayedContent
     }
 
-    func pausePlayback() -> INPlayMediaIntentResponseCode {
+    @MainActor
+    func pausePlayback(
+        using playbackPauser: any FixedSiriShortcutPlaybackPausing = PlaybackManager.shared
+    ) -> INPlayMediaIntentResponseCode {
         AnalyticsHelper.siriPause()
-        AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
-        PlaybackManager.shared.pause()
+        if playbackPauser.isPlaying {
+            AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+        }
+        playbackPauser.pause(userInitiated: true)
         return INPlayMediaIntentResponseCode.success
     }
 

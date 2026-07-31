@@ -147,6 +147,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：继续播放" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：繼續播放" } }
       }
+    },
+    "${applicationName}: Up Next" : {
+      "comment" : "Phrase for running the Play Up Next App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Tot seguit" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Warteschlange" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Up Next" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: A continuación" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: A continuación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : File d’attente" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Prochains épisodes" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Prossimo" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で次のエピソード" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Hierna" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Próximos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Следующие" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Nästa" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：接下来播放" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：接下來播放" } }
+      }
+    },
+    "Play the next episode in ${applicationName}" : {
+      "comment" : "Phrase for running the Play Up Next App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reprodueix l’episodi següent" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: die nächste Folge abspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play the next episode in ${applicationName}" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir el episodio siguiente" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir el episodio siguiente" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire l’épisode suivant" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire l’épisode suivant" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: riproduci l’episodio successivo" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で次のエピソードを再生" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: speel de volgende aflevering af" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproduzir o próximo episódio" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: воспроизвести следующий выпуск" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: spela nästa avsnitt" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放下一集" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放下一集" } }
+      }
     }
   },
   "version" : "1.0"

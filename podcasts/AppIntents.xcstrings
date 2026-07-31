@@ -210,6 +210,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可继续播放的单集。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有可繼續播放的單集。" } }
       }
+    },
+    "siri_shortcut_play_up_next_description" : {
+      "comment" : "Description for the App Intent that plays the next episode in Up Next.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Reprodueix el primer episodi de la cua A continuació de Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Spielt die erste Folge in der Pocket Casts-Warteschlange ab." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Plays the first episode in the Pocket Casts Up Next queue." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce el primer episodio de la cola A continuación de Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce el primer episodio de la fila A continuación de Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit le premier épisode de la file À suivre de Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Lit le premier épisode de la file À suivre de Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riproduce il primo episodio nella coda In coda di Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsの「次に再生」キューの最初のエピソードを再生します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Speelt de eerste aflevering in de wachtrij Volgende van Pocket Casts af." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Reproduz o primeiro episódio da fila Próximo do Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Воспроизводит первый выпуск из очереди «Далее» в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Spelar det första avsnittet i Pocket Casts-kön Nästa." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放 Pocket Casts“接下来播放”队列中的第一集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "播放 Pocket Casts「接下來播放」佇列中的第一集。" } }
+      }
+    },
+    "siri_shortcut_play_up_next_no_episode_error" : {
+      "comment" : "Error shown when Play Up Next runs without another episode in the queue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap episodi següent a A continuació." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Unter „Als Nächstes“ gibt es keine weitere Folge." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no next episode in Up Next." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio siguiente en A continuación." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio siguiente en A continuación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucun épisode suivant dans À suivre." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucun épisode suivant dans À suivre." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non ci sono episodi successivi in In coda." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "「次に再生」に次のエピソードがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er staat geen volgende aflevering in Volgende." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há um próximo episódio em Próximo." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "В очереди «Далее» нет следующего выпуска." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget nästa avsnitt i Nästa." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "“接下来播放”中没有下一集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "「接下來播放」中沒有下一集。" } }
+      }
     }
   },
   "version" : "1.0"

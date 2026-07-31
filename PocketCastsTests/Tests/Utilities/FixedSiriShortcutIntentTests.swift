@@ -56,6 +56,25 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
 
         XCTAssertEqual(performer.performedActions, [.pausePlayback])
     }
+
+    @MainActor
+    func testPlayUpNextPerformsPlayUpNextAction() throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try PlayUpNextIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.playUpNext])
+    }
+
+    @MainActor
+    func testPlayUpNextFailsWhenThereIsNoNextEpisode() {
+        let performer = RecordingFixedSiriShortcutActionPerformer(actionSucceeded: false)
+
+        XCTAssertThrowsError(try PlayUpNextIntent().perform(using: performer)) { error in
+            XCTAssertEqual(error as? PlayUpNextIntentError, .noEpisode)
+        }
+        XCTAssertEqual(performer.performedActions, [.playUpNext])
+    }
 }
 
 @MainActor

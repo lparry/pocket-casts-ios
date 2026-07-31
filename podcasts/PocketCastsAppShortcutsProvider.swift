@@ -51,5 +51,18 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "pause.fill"
         )
+        AppShortcut(
+            intent: PlayUpNextIntent(),
+            phrases: [
+                "\(.applicationName): Up Next",
+                "Play the next episode in \(.applicationName)",
+            ],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_play_up_next_title",
+                defaultValue: "Playing next episode",
+                table: "Localizable"
+            ),
+            systemImageName: "text.line.first.and.arrowtriangle.forward"
+        )
     }
 }

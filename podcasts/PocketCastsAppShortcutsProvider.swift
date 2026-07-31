@@ -15,5 +15,18 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "moon.zzz.fill"
         )
+        AppShortcut(
+            intent: ExtendSleepTimerIntent(),
+            phrases: [
+                "\(.applicationName): Extend Sleep Timer",
+                "\(.applicationName): Extend sleep timer by 5 minutes",
+            ],
+            shortTitle: LocalizedStringResource(
+                "ny98Lo",
+                defaultValue: "Extend Sleep Timer",
+                table: "Intents"
+            ),
+            systemImageName: "timer"
+        )
     }
 }

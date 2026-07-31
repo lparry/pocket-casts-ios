@@ -42,6 +42,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：启动睡眠计时器" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：啟動睡眠計時器" } }
       }
+    },
+    "${applicationName}: Extend sleep timer by 5 minutes" : {
+      "comment" : "Phrase for running the extend sleep timer App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Amplia el temporitzador 5 minuts" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Schlummerfunktion um 5 Minuten verlängern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extend sleep timer by 5 minutes" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ampliar el temporizador en 5 minutos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extender temporizador de suspensión 5 minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Retarder la mise en veille de 5 minutes" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Prolonger la minuterie de veille de 5 minutes" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ritarda l'autospegnimento di 5 minuti" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}でスリープタイマーを5分延長" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Slaaptimer verlengen met 5 minuten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Estender o temporizador de soneca por 5 minutos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Отложить таймер спящего режима на 5 минут" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Förläng sovtimer med 5 minuter" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：将睡眠计时器延长 5 分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：將睡眠計時器延長 5 分鐘" } }
+      }
+    },
+    "${applicationName}: Extend Sleep Timer" : {
+      "comment" : "Phrase for running the extend sleep timer App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Amplia el temporitzador" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Schlummerfunktion verlängern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extend Sleep Timer" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ampliar temporizador" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extender temporizador de suspensión" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Retarder la mise en veille" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Prolonger la minuterie de veille" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ritarda autospegnimento" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}でスリープタイマーを延長" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Slaaptimer verlengen" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Prolongar temporizador" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Отложить таймер сна" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Förläng Sovtimer" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延长睡眠计时器" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延長睡眠計時器" } }
+      }
     }
   },
   "version" : "1.0"

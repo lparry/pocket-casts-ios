@@ -7,6 +7,7 @@
 - Fix the Chromecast button being invisible in the fullscreen video player [#5060](https://github.com/Automattic/pocket-casts-ios/pull/5060)
 - Fix a memory leak that kept the episode details screen, its views and artwork in memory after it was closed [#5067](https://github.com/Automattic/pocket-casts-ios/pull/5067)
 - Fix the controls in the fullscreen video player being too small to tap reliably [#5059](https://github.com/Automattic/pocket-casts-ios/pull/5059)
+- Add App Shortcuts for resuming and pausing playback, playing Up Next or a suggested episode, skipping chapters, marking episodes as played and extending the sleep timer
 
 8.20
 -----

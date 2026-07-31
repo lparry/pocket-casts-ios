@@ -273,6 +273,27 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：上一章" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：上一章" } }
       }
+    },
+    "${applicationName}: Mark as Played" : {
+      "comment" : "Phrase for running the Mark as Played App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marca com a reproduït" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Als gehört markieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Mark as Played" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marcar como reproducido" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marcar como reproducido" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Marquer comme lu" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Marquer comme lu" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Contrassegna come Riprodotto" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で再生済みとしてマーク" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Markeren als afgespeeld" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marcar como reproduzido" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Отметить как прослушанный" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Markera som Uppspelat" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：标记为已播放" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：標記為已播放" } }
+      }
     }
   },
   "version" : "1.0"

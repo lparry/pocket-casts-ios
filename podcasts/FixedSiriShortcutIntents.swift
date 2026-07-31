@@ -10,6 +10,7 @@ enum FixedSiriShortcutAction: Equatable {
     case playSuggested
     case nextChapter
     case previousChapter
+    case markAsPlayed
 }
 
 enum FixedSiriShortcutActionResult: Equatable {
@@ -152,6 +153,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
                 return await skipToNextChapter(using: PlaybackManager.shared)
             case .previousChapter:
                 return await skipToPreviousChapter(using: PlaybackManager.shared)
+            case .markAsPlayed:
+                return markAsPlayed() == .success ? .success : .unavailable
             }
         }
     }
@@ -284,6 +287,21 @@ enum PreviousChapterIntentError: LocalizedError, Equatable {
             defaultValue: "Unable to skip to the previous chapter.",
             table: "AppIntents"
         )
+    }
+}
+
+enum MarkAsPlayedIntentError: LocalizedError, Equatable {
+    case noEpisode
+
+    var errorDescription: String? {
+        switch self {
+        case .noEpisode:
+            String(
+                localized: "siri_shortcut_mark_as_played_no_episode_error",
+                defaultValue: "There’s no current episode to mark as played.",
+                table: "AppIntents"
+            )
+        }
     }
 }
 
@@ -509,6 +527,39 @@ struct PreviousChapterIntent: AudioPlaybackIntent {
     func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
         guard await actionPerformer.perform(.previousChapter) == .success else {
             throw PreviousChapterIntentError.unavailable
+        }
+    }
+}
+
+struct MarkAsPlayedIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_mark_as_played_title",
+        defaultValue: "Mark Current Episode as Played",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_mark_as_played_description",
+            defaultValue: "Marks the current Pocket Casts episode as played.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        guard await actionPerformer.perform(.markAsPlayed) == .success else {
+            throw MarkAsPlayedIntentError.noEpisode
         }
     }
 }

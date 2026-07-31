@@ -47,6 +47,15 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
         }
         XCTAssertEqual(performer.performedActions, [.resumePlayback])
     }
+
+    @MainActor
+    func testPausePlaybackPerformsPauseAction() {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        PausePlaybackIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.pausePlayback])
+    }
 }
 
 @MainActor

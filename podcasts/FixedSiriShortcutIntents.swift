@@ -3,6 +3,7 @@ import AppIntents
 enum FixedSiriShortcutAction: Equatable {
     case extendSleepTimer(minutes: Int)
     case resumePlayback
+    case pausePlayback
 }
 
 @MainActor
@@ -19,6 +20,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
             return extendSleepTimer(addTime: minutes)
         case .resumePlayback:
             return resumePlayback() == .success
+        case .pausePlayback:
+            return pausePlayback() == .success
         }
     }
 }
@@ -68,6 +71,37 @@ struct ResumePlaybackIntent: AudioPlaybackIntent {
         guard actionPerformer.perform(.resumePlayback) else {
             throw ResumePlaybackIntentError.noEpisode
         }
+    }
+}
+
+struct PausePlaybackIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_pause_title",
+        defaultValue: "Pause Current Episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_pause_playback_description",
+            defaultValue: "Pauses playback in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) {
+        actionPerformer.perform(.pausePlayback)
     }
 }
 

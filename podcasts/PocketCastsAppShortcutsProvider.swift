@@ -41,5 +41,15 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "play.fill"
         )
+        AppShortcut(
+            intent: PausePlaybackIntent(),
+            phrases: ["\(.applicationName): Pause"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_pause_title",
+                defaultValue: "Pause Current Episode",
+                table: "Localizable"
+            ),
+            systemImageName: "pause.fill"
+        )
     }
 }

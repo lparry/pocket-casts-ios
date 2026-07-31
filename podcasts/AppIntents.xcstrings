@@ -148,6 +148,27 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分鐘" } }
       }
     },
+    "siri_shortcut_pause_playback_description" : {
+      "comment" : "Description of the Pause Playback app intent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Posa en pausa la reproducció a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Pausiert die Wiedergabe in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pauses playback in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pausa la reproducción en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Pausa la reproducción en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Met la lecture en pause dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Met la lecture en pause dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mette in pausa la riproduzione in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで再生を一時停止します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Pauzeert het afspelen in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pausa a reprodução no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Приостанавливает воспроизведение в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Pausar uppspelningen i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂停 Pocket Casts 中的播放。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "暫停 Pocket Casts 中的播放。" } }
+      }
+    },
     "siri_shortcut_resume_playback_description" : {
       "comment" : "Description for the App Intent that resumes playback.",
       "extractionState" : "manual",

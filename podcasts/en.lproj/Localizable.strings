@@ -5156,6 +5156,21 @@
 /* Up Next sort option that orders episodes by time remaining, longest first */
 "up_next_sort_longest_to_shortest" = "Longest to shortest";
 
+/* Alert title shown before sorting Up Next when the sort may change automatically managed downloads */
+"up_next_sort_confirmation_title" = "Sort Up Next?";
+
+/* Alert message shown before sorting Up Next when the sort may add or remove automatically managed downloads */
+"up_next_sort_confirmation_message" = "This may download episodes moved toward the front and remove downloads moved further down your queue.";
+
+/* Button title that confirms sorting Up Next when automatically managed downloads may change */
+"up_next_sort_confirmation_action" = "Sort";
+
+/* Toast message shown after Up Next has been sorted */
+"up_next_sort_applied" = "Up Next sorted";
+
+/* Button title that restores the Up Next order from before the latest sort */
+"up_next_sort_undo" = "Undo";
+
 /* Title of the tooltip shown on the Up Next tab that alerts users to the new sort by duration option */
 "up_next_sort_duration_tooltip_title" = "Sort by duration";
 

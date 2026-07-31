@@ -186,7 +186,7 @@ class PlaybackQueue: NSObject {
     }
 
     /// Reorders the Up Next queue to match `sortedEpisodes` (the queued episodes excluding now playing, which stays pinned at the top).
-    func reorderUpNext(sortedEpisodes: [BaseEpisode]) {
+    func reorderUpNext(sortedEpisodes: [BaseEpisode], checkForAutoDownload: Bool = true) {
         guard sortedEpisodes.count > 1 else { return }
 
         // Up Next playlist entries, excluding the now playing episode at index 0.
@@ -210,7 +210,38 @@ class PlaybackQueue: NSObject {
 
         saveReplaceIfRequired()
 
-        refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged)
+        refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged, checkForAutoDownload: checkForAutoDownload)
+    }
+
+    /// Captures the order of the queued episodes, excluding now playing so it can remain pinned if playback advances.
+    func upNextOrderSnapshot() -> [String] {
+        Array(DataManager.sharedManager.allUpNextPlaylistEpisodes().dropFirst()).map(\.episodeUuid)
+    }
+
+    /// Restores the relative order of episodes that are still in Up Next.
+    /// Episodes added since the snapshot are retained at the bottom.
+    func restoreUpNextOrder(_ episodeUuids: [String], checkForAutoDownload: Bool = true) {
+        let allPlaylistEpisodes = DataManager.sharedManager.allUpNextPlaylistEpisodes()
+        guard allPlaylistEpisodes.count > 1 else { return }
+
+        var remaining = Array(allPlaylistEpisodes.dropFirst())
+        var ordered = [PlaylistEpisode]()
+
+        for episodeUuid in episodeUuids {
+            if let index = remaining.firstIndex(where: { $0.episodeUuid == episodeUuid }) {
+                ordered.append(remaining.remove(at: index))
+            }
+        }
+        ordered.append(contentsOf: remaining)
+
+        for (index, playlistEpisode) in ordered.enumerated() {
+            playlistEpisode.episodePosition = Int32(index + 1)
+        }
+        DataManager.sharedManager.save(playlistEpisodes: ordered)
+
+        saveReplaceIfRequired()
+
+        refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged, checkForAutoDownload: checkForAutoDownload)
     }
 
     func insert(episode: BaseEpisode, position: Int) {
@@ -495,8 +526,8 @@ class PlaybackQueue: NSObject {
         topEpisode = episodeAt(index: -1)
     }
 
-    private func refreshAppFiring(notificationName: Notification.Name?, notificationObject: Any? = nil, notificationUserInfo: [AnyHashable: Any]? = nil) {
-        refreshList(checkForAutoDownload: true)
+    private func refreshAppFiring(notificationName: Notification.Name?, notificationObject: Any? = nil, notificationUserInfo: [AnyHashable: Any]? = nil, checkForAutoDownload: Bool = true) {
+        refreshList(checkForAutoDownload: checkForAutoDownload)
 
         if let name = notificationName {
             NotificationCenter.postOnMainThread(notification: name, object: notificationObject, userInfo: notificationUserInfo)

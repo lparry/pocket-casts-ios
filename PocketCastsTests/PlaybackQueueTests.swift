@@ -74,6 +74,41 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertTrue(mockDataManager.savedPlaylistEpisodes.isEmpty, "Reordering one episode should be a no-op")
     }
 
+    func testUpNextOrderSnapshotExcludesNowPlaying() {
+        let playbackQueue = PlaybackQueue()
+        let mockDataManager = MockDataManager()
+        DataManager.sharedManager = mockDataManager
+
+        mockDataManager.upNextEpisodes = [
+            playlistEpisode(uuid: "now-playing", position: 0),
+            playlistEpisode(uuid: "a", position: 1),
+            playlistEpisode(uuid: "b", position: 2)
+        ]
+
+        XCTAssertEqual(playbackQueue.upNextOrderSnapshot(), ["a", "b"])
+    }
+
+    func testRestoreUpNextOrderKeepsCurrentEpisodePinnedAndRetainsNewEpisodes() {
+        let playbackQueue = PlaybackQueue()
+        let mockDataManager = MockDataManager()
+        DataManager.sharedManager = mockDataManager
+
+        mockDataManager.upNextEpisodes = [
+            playlistEpisode(uuid: "new-now-playing", position: 0),
+            playlistEpisode(uuid: "b", position: 1),
+            playlistEpisode(uuid: "new", position: 2),
+            playlistEpisode(uuid: "a", position: 3)
+        ]
+
+        playbackQueue.restoreUpNextOrder(["a", "old-now-playing", "b"], checkForAutoDownload: false)
+
+        let savedUuids = mockDataManager.savedPlaylistEpisodes.map(\.episodeUuid)
+        let savedPositions = mockDataManager.savedPlaylistEpisodes.map(\.episodePosition)
+
+        XCTAssertEqual(savedUuids, ["a", "b", "new"])
+        XCTAssertEqual(savedPositions, [1, 2, 3])
+    }
+
     func testAutoDownloadEntireQueueReturnsEveryEpisodeInOrder() {
         let queue = [
             playlistEpisode(uuid: "now-playing", position: 0),

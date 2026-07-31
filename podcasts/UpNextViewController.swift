@@ -4,6 +4,9 @@ import PocketCastsServer
 import UIKit
 
 class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
+    private static let sortUndoToastDuration: TimeInterval = 5
+    private static let sortDownloadReconciliationDelay: TimeInterval = sortUndoToastDuration + 0.5
+
     static let playerCell = "PlayerCell"
     static let nowPlayingCell = "UpNextNowPlayingCell"
     static let emptyStateCell = "EmptyStateCell"
@@ -136,6 +139,7 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
 
     var multiSelectGestureInProgress = false
     var isReorderInProgress = false
+    private var pendingSortDownloadReconciliation: DispatchWorkItem?
 
     @IBOutlet var upNextTable: ThemeableTable! {
         didSet {
@@ -381,14 +385,73 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
         let optionsPicker = OptionsPicker(title: L10n.upNextSortTitle.localizedUppercase, themeOverride: themeOverride)
         for option in UpNextSortOption.allCases {
             let action = OptionAction(label: option.description) { [weak self] in
-                let queue = PlaybackManager.shared.queue
-                queue.reorderUpNext(sortedEpisodes: option.sort(queue.allEpisodes(includeNowPlaying: false)))
-                self?.reloadTable()
-                self?.track(.upNextSort, properties: ["sort_type": option.analyticsDescription])
+                self?.sortUpNext(using: option)
             }
             optionsPicker.addAction(action: action)
         }
         return optionsPicker
+    }
+
+    private func sortUpNext(using option: UpNextSortOption) {
+        let queue = PlaybackManager.shared.queue
+        let currentEpisodes = queue.allEpisodes(includeNowPlaying: false)
+        let sortedEpisodes = option.sort(currentEpisodes)
+
+        guard currentEpisodes.map(\.uuid) != sortedEpisodes.map(\.uuid) else { return }
+
+        if Settings.downloadUpNextEpisodes(), Settings.upNextAutoDownloadLimit() != .entireQueue {
+            let alert = UIAlertController(
+                title: L10n.upNextSortConfirmationTitle,
+                message: L10n.upNextSortConfirmationMessage,
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: L10n.cancel, style: .cancel))
+            alert.addAction(UIAlertAction(title: L10n.upNextSortConfirmationAction, style: .default) { [weak self] _ in
+                self?.applySort(sortedEpisodes, option: option)
+            })
+            present(alert, animated: true)
+        } else {
+            applySort(sortedEpisodes, option: option)
+        }
+    }
+
+    private func applySort(_ sortedEpisodes: [BaseEpisode], option: UpNextSortOption) {
+        let queue = PlaybackManager.shared.queue
+        let previousOrder = queue.upNextOrderSnapshot()
+
+        DataManager.sharedManager.snapshotUpNext()
+        pendingSortDownloadReconciliation?.cancel()
+        queue.reorderUpNext(sortedEpisodes: sortedEpisodes, checkForAutoDownload: false)
+        scheduleSortDownloadReconciliation(after: Self.sortDownloadReconciliationDelay)
+
+        reloadTable()
+        track(.upNextSort, properties: ["sort_type": option.analyticsDescription])
+
+        Toast.show(
+            L10n.upNextSortApplied,
+            actions: [
+                Toast.Action(title: L10n.upNextSortUndo) { [weak self] in
+                    self?.undoSort(previousOrder: previousOrder)
+                }
+            ],
+            dismissAfter: .interval(Self.sortUndoToastDuration),
+            aboveMiniPlayer: showingInTab
+        )
+    }
+
+    private func undoSort(previousOrder: [String]) {
+        pendingSortDownloadReconciliation?.cancel()
+        PlaybackManager.shared.queue.restoreUpNextOrder(previousOrder, checkForAutoDownload: false)
+        scheduleSortDownloadReconciliation()
+        reloadTable()
+    }
+
+    private func scheduleSortDownloadReconciliation(after delay: TimeInterval = 0.75) {
+        let workItem = DispatchWorkItem {
+            PlaybackManager.shared.queue.refreshList(checkForAutoDownload: true)
+        }
+        pendingSortDownloadReconciliation = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     @objc private func updateShuffleButtonState() {

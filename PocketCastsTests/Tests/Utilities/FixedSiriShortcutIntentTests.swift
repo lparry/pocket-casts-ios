@@ -121,6 +121,28 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
 
         XCTAssertEqual(performer.performedActions, [.previousChapter])
     }
+
+    @MainActor
+    func testMarkAsPlayedPerformsMarkAsPlayedAction() async throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try await MarkAsPlayedIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.markAsPlayed])
+    }
+
+    @MainActor
+    func testMarkAsPlayedFailsWhenThereIsNoCurrentEpisode() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(actionSucceeded: false)
+
+        do {
+            try await MarkAsPlayedIntent().perform(using: performer)
+            XCTFail("Expected Mark as Played to fail")
+        } catch {
+            XCTAssertEqual(error as? MarkAsPlayedIntentError, .noEpisode)
+        }
+        XCTAssertEqual(performer.performedActions, [.markAsPlayed])
+    }
 }
 
 @MainActor

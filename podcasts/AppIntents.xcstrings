@@ -334,6 +334,44 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到上一章。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到上一章。" } }
       }
+    },
+    "siri_shortcut_mark_as_played_description" : {
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Marca l’episodi actual de Pocket Casts com a reproduït." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Markiert die aktuelle Pocket Casts-Episode als gespielt." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Marks the current Pocket Casts episode as played." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Marca el episodio actual de Pocket Casts como reproducido." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Marca el episodio actual de Pocket Casts como reproducido." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Marque l’épisode Pocket Casts actuel comme lu." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Marque l’épisode Pocket Casts actuel comme lu." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Segna come riprodotto l’episodio attuale di Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "現在のPocket Castsエピソードを再生済みにします。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Markeert de huidige Pocket Casts-aflevering als afgespeeld." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Marca o episódio atual do Pocket Casts como reproduzido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отмечает текущий выпуск Pocket Casts как прослушанный." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Markerar det aktuella Pocket Casts-avsnittet som spelat." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将当前 Pocket Casts 单集标记为已播放。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "將目前的 Pocket Casts 單集標記為已播放。" } }
+      }
+    },
+    "siri_shortcut_mark_as_played_no_episode_error" : {
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap episodi actual per marcar com a reproduït." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Es gibt keine aktuelle Episode, die als gespielt markiert werden kann." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no current episode to mark as played." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio actual para marcar como reproducido." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio actual para marcar como reproducido." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode en cours ne peut être marqué comme lu." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode en cours ne peut être marqué comme lu." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non c’è un episodio attuale da segnare come riprodotto." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再生済みにする現在のエピソードがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is geen huidige aflevering om als afgespeeld te markeren." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há um episódio atual para marcar como reproduzido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет текущего выпуска, который можно отметить как прослушанный." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget aktuellt avsnitt att markera som spelat." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可标记为已播放的当前单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有可標記為已播放的目前單集。" } }
+      }
     }
   },
   "version" : "1.0"

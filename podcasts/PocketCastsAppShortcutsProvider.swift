@@ -97,5 +97,15 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "backward.end.fill"
         )
+        AppShortcut(
+            intent: MarkAsPlayedIntent(),
+            phrases: ["\(.applicationName): Mark as Played"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_mark_as_played_title",
+                defaultValue: "Mark Current Episode as Played",
+                table: "Localizable"
+            ),
+            systemImageName: "checkmark.circle.fill"
+        )
     }
 }

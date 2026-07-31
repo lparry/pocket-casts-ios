@@ -3,77 +3,105 @@ import XCTest
 
 final class FixedSiriShortcutIntentTests: XCTestCase {
     @MainActor
-    func testExtendSleepTimerUsesFiveMinutesByDefault() {
+    func testExtendSleepTimerUsesFiveMinutesByDefault() async {
         let performer = RecordingFixedSiriShortcutActionPerformer()
 
-        ExtendSleepTimerIntent().perform(using: performer)
+        await ExtendSleepTimerIntent().perform(using: performer)
 
         XCTAssertEqual(performer.performedActions, [.extendSleepTimer(minutes: 5)])
     }
 
     @MainActor
-    func testExtendSleepTimerPreservesMigratedMinutes() {
+    func testExtendSleepTimerPreservesMigratedMinutes() async {
         let performer = RecordingFixedSiriShortcutActionPerformer()
 
-        ExtendSleepTimerIntent(minutes: 12).perform(using: performer)
+        await ExtendSleepTimerIntent(minutes: 12).perform(using: performer)
 
         XCTAssertEqual(performer.performedActions, [.extendSleepTimer(minutes: 12)])
     }
 
     @MainActor
-    func testExtendSleepTimerUsesFiveMinutesForInvalidMigratedValue() {
+    func testExtendSleepTimerUsesFiveMinutesForInvalidMigratedValue() async {
         let performer = RecordingFixedSiriShortcutActionPerformer()
 
-        ExtendSleepTimerIntent(minutes: 0).perform(using: performer)
+        await ExtendSleepTimerIntent(minutes: 0).perform(using: performer)
 
         XCTAssertEqual(performer.performedActions, [.extendSleepTimer(minutes: 5)])
     }
 
     @MainActor
-    func testResumePlaybackPerformsResumeAction() throws {
+    func testResumePlaybackPerformsResumeAction() async throws {
         let performer = RecordingFixedSiriShortcutActionPerformer()
 
-        try ResumePlaybackIntent().perform(using: performer)
+        try await ResumePlaybackIntent().perform(using: performer)
 
         XCTAssertEqual(performer.performedActions, [.resumePlayback])
     }
 
     @MainActor
-    func testResumePlaybackFailsWhenThereIsNoEpisodeToResume() {
+    func testResumePlaybackFailsWhenThereIsNoEpisodeToResume() async {
         let performer = RecordingFixedSiriShortcutActionPerformer(actionSucceeded: false)
 
-        XCTAssertThrowsError(try ResumePlaybackIntent().perform(using: performer)) { error in
+        do {
+            try await ResumePlaybackIntent().perform(using: performer)
+            XCTFail("Expected resume playback to fail")
+        } catch {
             XCTAssertEqual(error as? ResumePlaybackIntentError, .noEpisode)
         }
         XCTAssertEqual(performer.performedActions, [.resumePlayback])
     }
 
     @MainActor
-    func testPausePlaybackPerformsPauseAction() {
+    func testPausePlaybackPerformsPauseAction() async {
         let performer = RecordingFixedSiriShortcutActionPerformer()
 
-        PausePlaybackIntent().perform(using: performer)
+        await PausePlaybackIntent().perform(using: performer)
 
         XCTAssertEqual(performer.performedActions, [.pausePlayback])
     }
 
     @MainActor
-    func testPlayUpNextPerformsPlayUpNextAction() throws {
+    func testPlayUpNextPerformsPlayUpNextAction() async throws {
         let performer = RecordingFixedSiriShortcutActionPerformer()
 
-        try PlayUpNextIntent().perform(using: performer)
+        try await PlayUpNextIntent().perform(using: performer)
 
         XCTAssertEqual(performer.performedActions, [.playUpNext])
     }
 
     @MainActor
-    func testPlayUpNextFailsWhenThereIsNoNextEpisode() {
+    func testPlayUpNextFailsWhenThereIsNoNextEpisode() async {
         let performer = RecordingFixedSiriShortcutActionPerformer(actionSucceeded: false)
 
-        XCTAssertThrowsError(try PlayUpNextIntent().perform(using: performer)) { error in
+        do {
+            try await PlayUpNextIntent().perform(using: performer)
+            XCTFail("Expected Play Up Next to fail")
+        } catch {
             XCTAssertEqual(error as? PlayUpNextIntentError, .noEpisode)
         }
         XCTAssertEqual(performer.performedActions, [.playUpNext])
+    }
+
+    @MainActor
+    func testPlaySuggestedPerformsPlaySuggestedAction() async throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try await PlaySuggestedIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.playSuggested])
+    }
+
+    @MainActor
+    func testPlaySuggestedFailsWhenNoSuggestionIsAvailable() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(actionSucceeded: false)
+
+        do {
+            try await PlaySuggestedIntent().perform(using: performer)
+            XCTFail("Expected Play Suggested to fail")
+        } catch {
+            XCTAssertEqual(error as? PlaySuggestedIntentError, .unavailable)
+        }
+        XCTAssertEqual(performer.performedActions, [.playSuggested])
     }
 }
 
@@ -86,7 +114,7 @@ private final class RecordingFixedSiriShortcutActionPerformer: FixedSiriShortcut
         self.actionSucceeded = actionSucceeded
     }
 
-    func perform(_ action: FixedSiriShortcutAction) -> Bool {
+    func perform(_ action: FixedSiriShortcutAction) async -> Bool {
         performedActions.append(action)
         return actionSucceeded
     }

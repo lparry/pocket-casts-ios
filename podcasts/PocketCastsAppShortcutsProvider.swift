@@ -64,5 +64,18 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "text.line.first.and.arrowtriangle.forward"
         )
+        AppShortcut(
+            intent: PlaySuggestedIntent(),
+            phrases: [
+                "Play Suggested in \(.applicationName)",
+                "\(.applicationName): Play a suggested episode",
+            ],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_play_suggested_podcast_title",
+                defaultValue: "Playing a suggested episode",
+                table: "Localizable"
+            ),
+            systemImageName: "sparkles"
+        )
     }
 }

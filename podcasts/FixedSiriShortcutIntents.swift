@@ -5,17 +5,18 @@ enum FixedSiriShortcutAction: Equatable {
     case resumePlayback
     case pausePlayback
     case playUpNext
+    case playSuggested
 }
 
 @MainActor
 protocol FixedSiriShortcutActionPerforming {
     @discardableResult
-    func perform(_ action: FixedSiriShortcutAction) -> Bool
+    func perform(_ action: FixedSiriShortcutAction) async -> Bool
 }
 
 extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
     @discardableResult
-    func perform(_ action: FixedSiriShortcutAction) -> Bool {
+    func perform(_ action: FixedSiriShortcutAction) async -> Bool {
         switch action {
         case let .extendSleepTimer(minutes):
             return extendSleepTimer(addTime: minutes)
@@ -25,6 +26,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
             return pausePlayback() == .success
         case .playUpNext:
             return playUpNext() == .success
+        case .playSuggested:
+            return await playSuggestedAsync() == .success
         }
     }
 }
@@ -59,6 +62,21 @@ enum PlayUpNextIntentError: LocalizedError, Equatable {
     }
 }
 
+enum PlaySuggestedIntentError: LocalizedError, Equatable {
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            String(
+                localized: "siri_shortcut_play_suggested_unavailable_error",
+                defaultValue: "A suggested episode isn’t available right now.",
+                table: "AppIntents"
+            )
+        }
+    }
+}
+
 struct ResumePlaybackIntent: AudioPlaybackIntent {
     static var title = LocalizedStringResource(
         "siri_shortcut_resume_title",
@@ -80,13 +98,13 @@ struct ResumePlaybackIntent: AudioPlaybackIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        try perform(using: SiriShortcutsManager.shared)
+        try await perform(using: SiriShortcutsManager.shared)
         return .result()
     }
 
     @MainActor
-    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) throws {
-        guard actionPerformer.perform(.resumePlayback) else {
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        guard await actionPerformer.perform(.resumePlayback) else {
             throw ResumePlaybackIntentError.noEpisode
         }
     }
@@ -113,13 +131,13 @@ struct PausePlaybackIntent: AudioPlaybackIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        perform(using: SiriShortcutsManager.shared)
+        await perform(using: SiriShortcutsManager.shared)
         return .result()
     }
 
     @MainActor
-    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) {
-        actionPerformer.perform(.pausePlayback)
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async {
+        await actionPerformer.perform(.pausePlayback)
     }
 }
 
@@ -144,14 +162,47 @@ struct PlayUpNextIntent: AudioPlaybackIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        try perform(using: SiriShortcutsManager.shared)
+        try await perform(using: SiriShortcutsManager.shared)
         return .result()
     }
 
     @MainActor
-    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) throws {
-        guard actionPerformer.perform(.playUpNext) else {
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        guard await actionPerformer.perform(.playUpNext) else {
             throw PlayUpNextIntentError.noEpisode
+        }
+    }
+}
+
+struct PlaySuggestedIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_play_suggested_podcast_title",
+        defaultValue: "Playing a suggested episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_play_suggested_description",
+            defaultValue: "Plays a suggested episode in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        guard await actionPerformer.perform(.playSuggested) else {
+            throw PlaySuggestedIntentError.unavailable
         }
     }
 }
@@ -200,13 +251,13 @@ struct ExtendSleepTimerIntent: AudioPlaybackIntent, CustomIntentMigratedAppInten
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        perform(using: SiriShortcutsManager.shared)
+        await perform(using: SiriShortcutsManager.shared)
         return .result()
     }
 
     @MainActor
-    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) {
-        actionPerformer.perform(.extendSleepTimer(minutes: resolvedMinutes))
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async {
+        await actionPerformer.perform(.extendSleepTimer(minutes: resolvedMinutes))
     }
 
     private var resolvedMinutes: Int {

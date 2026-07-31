@@ -252,6 +252,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "“接下来播放”中没有下一集。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "「接下來播放」中沒有下一集。" } }
       }
+    },
+    "siri_shortcut_play_suggested_description" : {
+      "comment" : "Description for the App Intent that plays a suggested episode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Reprodueix un episodi suggerit a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Spielt eine vorgeschlagene Folge in Pocket Casts ab." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Plays a suggested episode in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce un episodio sugerido en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce un episodio sugerido en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit un épisode suggéré dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Lit un épisode suggéré dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riproduce un episodio suggerito in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsでおすすめのエピソードを再生します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Speelt een voorgestelde aflevering af in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Reproduz um episódio sugerido no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Воспроизводит рекомендованный выпуск в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Spelar ett föreslaget avsnitt i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中播放推荐的单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中播放推薦的單集。" } }
+      }
+    },
+    "siri_shortcut_play_suggested_unavailable_error" : {
+      "comment" : "Error shown when no suggested episode can be played.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Ara mateix no hi ha cap episodi suggerit disponible." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zurzeit ist keine vorgeschlagene Folge verfügbar." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A suggested episode isn’t available right now." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio sugerido disponible en este momento." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio sugerido disponible en este momento." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode suggéré n’est disponible pour le moment." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode suggéré n’est disponible pour le moment." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Al momento non è disponibile alcun episodio suggerito." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "現在、おすすめのエピソードを利用できません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is momenteel geen voorgestelde aflevering beschikbaar." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há um episódio sugerido disponível no momento." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сейчас нет доступных рекомендованных выпусков." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget föreslaget avsnitt tillgängligt just nu." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目前没有可播放的推荐单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前沒有可播放的推薦單集。" } }
+      }
     }
   },
   "version" : "1.0"

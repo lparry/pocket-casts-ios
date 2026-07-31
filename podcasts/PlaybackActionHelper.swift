@@ -36,6 +36,25 @@ class PlaybackActionHelper {
         PlaybackManager.shared.playPause()
     }
 
+    @MainActor
+    class func playPause() async -> Bool {
+        await BackgroundPlayback.run {
+            HapticsHelper.triggerPlayPauseHaptic()
+
+            if PlaybackManager.shared.isPlaying {
+                PlaybackManager.shared.pause()
+                return true
+            }
+
+            return await withCheckedContinuation { continuation in
+                PlaybackManager.shared.play(
+                    completion: { continuation.resume(returning: true) },
+                    failure: { continuation.resume(returning: false) }
+                )
+            }
+        }
+    }
+
     class func download(episodeUuid: String) {
         AnalyticsEpisodeHelper.shared.downloaded(episodeUUID: episodeUuid)
 

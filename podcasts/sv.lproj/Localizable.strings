@@ -3630,7 +3630,7 @@ Här är ett %1$@ gästpass för Pocket Casts Plus – min favoritpodcastspelare
     <key>siri_shortcut_resume_phrase</key>
     <string>Återuppta</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Återupptar aktuellt avsnitt</string>
+    <string>Återuppta aktuellt avsnitt</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Skapa genväg till podcast</string>
     <key>skip_back</key>

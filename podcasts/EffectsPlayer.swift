@@ -74,12 +74,35 @@ class EffectsPlayer: PlaybackProtocol, Hashable {
         return false
     }
 
-    func play(completion: (() -> Void)?) {
+    func play(completion: (() -> Void)?, failure: (() -> Void)?) {
+        play(
+            completion: completion,
+            failure: failure,
+            fallback: { error in
+                PlaybackManager.shared.playbackDidFail(error: error, fallbackToDefaultPlayer: true, completion: completion, failure: failure)
+            }
+        )
+    }
+
+    func play(
+        completion: (() -> Void)?,
+        failure: (() -> Void)?,
+        fallback: @escaping (PlaybackManager.PlaybackError) -> Void
+    ) {
         aboutToPlay.value = true
         shouldKeepPlaying.value = true
 
         DispatchQueue.global().async { [weak self] in
-            guard let strongSelf = self, let episode = strongSelf.episode else { return }
+            guard let strongSelf = self else {
+                failure?()
+                return
+            }
+            guard let episode = strongSelf.episode, let episodePath = strongSelf.episodePath else {
+                strongSelf.aboutToPlay.value = false
+                strongSelf.shouldKeepPlaying.value = false
+                failure?()
+                return
+            }
 
             strongSelf.playerLock.lock()
 
@@ -112,7 +135,7 @@ class EffectsPlayer: PlaybackProtocol, Hashable {
             strongSelf.timePitch?.rate = 1.0
             strongSelf.engine?.attach(strongSelf.timePitch!)
 
-            let fileURL = URL(fileURLWithPath: strongSelf.episodePath!)
+            let fileURL = URL(fileURLWithPath: episodePath)
             do {
                 strongSelf.audioFile = try AVAudioFile(forReading: fileURL, commonFormat: AVAudioCommonFormat.pcmFormatFloat32, interleaved: false)
 
@@ -129,7 +152,9 @@ class EffectsPlayer: PlaybackProtocol, Hashable {
                 }
             } catch {
                 strongSelf.playerLock.unlock()
-                PlaybackManager.shared.playbackDidFail(error: .fileCorrupted(logMessage: error.localizedDescription), fallbackToDefaultPlayer: true)
+                strongSelf.aboutToPlay.value = false
+                strongSelf.shouldKeepPlaying.value = false
+                fallback(.fileCorrupted(logMessage: error.localizedDescription))
                 return
             }
 
@@ -164,14 +189,24 @@ class EffectsPlayer: PlaybackProtocol, Hashable {
                 try strongSelf.engine?.start()
             } catch {
                 strongSelf.playerLock.unlock()
-                PlaybackManager.shared.playbackDidFail(error: .fileCorrupted(logMessage: error.localizedDescription))
+                strongSelf.aboutToPlay.value = false
+                strongSelf.shouldKeepPlaying.value = false
+                PlaybackManager.shared.playbackDidFail(
+                    error: .fileCorrupted(logMessage: error.localizedDescription),
+                    failure: failure
+                )
                 return
             }
             // there seem to be cases where the above call succeeds but the engine isn't actually started. Handle that here
             if !(strongSelf.engine?.isRunning ?? false) {
                 strongSelf.playerLock.unlock()
+                strongSelf.aboutToPlay.value = false
+                strongSelf.shouldKeepPlaying.value = false
                 FileLog.shared.addMessage("EffectsPlayer: engine reported not running, calling playbackDidFail")
-                PlaybackManager.shared.playbackDidFail(error: .fileCorrupted(logMessage: "AVAudioEngine reported not running"))
+                PlaybackManager.shared.playbackDidFail(
+                    error: .fileCorrupted(logMessage: "AVAudioEngine reported not running"),
+                    failure: failure
+                )
                 return
             }
 
@@ -183,7 +218,7 @@ class EffectsPlayer: PlaybackProtocol, Hashable {
                 FileLog.shared.addMessage("EffectsPlayer: failed to start playback: \(error)")
                 strongSelf.playerLock.unlock()
                 PlaybackManager.shared.pause(userInitiated: false)
-                completion?()
+                failure?()
                 return
             }
 

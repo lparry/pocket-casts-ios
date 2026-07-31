@@ -38,6 +38,7 @@ class PlaybackManager: ServerPlaybackDelegate {
 
     private var currentEffects: PlaybackEffects?
     private var player: PlaybackProtocol?
+    private let playbackStarts = PlaybackStartRequests()
 
     private var interruptInProgress = false
 
@@ -173,33 +174,67 @@ class PlaybackManager: ServerPlaybackDelegate {
         queue.recordUpNextUserInteraction()
     }
 
-    func load(episode: BaseEpisode, autoPlay: Bool, overrideUpNext: Bool, saveCurrentEpisode: Bool = true, completion: (() -> Void)? = nil) {
+    func load(
+        episode: BaseEpisode,
+        autoPlay: Bool,
+        overrideUpNext: Bool,
+        saveCurrentEpisode: Bool = true,
+        completion: (() -> Void)? = nil,
+        failure: (() -> Void)? = nil
+    ) {
         FileLog.shared.addMessage("Loading \(episode.displayableTitle()) with UUID \(episode.uuid) autoPlay \(autoPlay) overrideUpNext: \(overrideUpNext)")
 
         // if the user has built an Up Next list, preserve that but make this the currently playing episode
         if !overrideUpNext, queue.upNextCount() > 0, let currEpisode = currentEpisode, currEpisode.uuid != episode.uuid {
-            switchTo(episodeToPlay: episode, autoPlay: autoPlay, completion: completion)
+            switchTo(episodeToPlay: episode, autoPlay: autoPlay, completion: completion, failure: failure)
 
             return
         }
 
-        performLoad(episode: episode, autoPlay: autoPlay, overrideUpNext: overrideUpNext, saveCurrentEpisode: saveCurrentEpisode, completion: completion)
+        performLoad(
+            episode: episode,
+            autoPlay: autoPlay,
+            overrideUpNext: overrideUpNext,
+            saveCurrentEpisode: saveCurrentEpisode,
+            completion: completion,
+            failure: failure
+        )
     }
 
-    private func switchTo(episodeToPlay: BaseEpisode, autoPlay: Bool, completion: (() -> Void)? = nil) {
+    private func switchTo(
+        episodeToPlay: BaseEpisode,
+        autoPlay: Bool,
+        completion: (() -> Void)? = nil,
+        failure: (() -> Void)? = nil
+    ) {
         cancelUpdateTimer()
 
-        performLoad(episode: episodeToPlay, autoPlay: autoPlay, overrideUpNext: false, saveCurrentEpisode: false, completion: completion)
+        performLoad(
+            episode: episodeToPlay,
+            autoPlay: autoPlay,
+            overrideUpNext: false,
+            saveCurrentEpisode: false,
+            completion: completion,
+            failure: failure
+        )
 
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackTrackChanged)
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.upNextQueueChanged)
     }
 
-    private func performLoad(episode: BaseEpisode, autoPlay: Bool, overrideUpNext: Bool, saveCurrentEpisode: Bool, completion: (() -> Void)?) {
+    private func performLoad(
+        episode: BaseEpisode,
+        autoPlay: Bool,
+        overrideUpNext: Bool,
+        saveCurrentEpisode: Bool,
+        completion: (() -> Void)?,
+        failure: (() -> Void)?
+    ) {
         let episodeIsChanging = episode.uuid != currentEpisode?.uuid
 
         // A new episode shouldn't inherit the previous one's "watch downloaded video" choice.
         if episodeIsChanging {
+            playbackStarts.cancel()
             streamingVideoForDownloadedEpisode.value = false
         }
 
@@ -243,7 +278,7 @@ class PlaybackManager: ServerPlaybackDelegate {
 
         if autoPlay {
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackStarting)
-            play(completion: completion)
+            play(completion: completion, failure: failure)
 
             checkIfStreamBufferRequired(episode: episode, effects: effects())
         } else if episodeIsChanging {
@@ -283,8 +318,18 @@ class PlaybackManager: ServerPlaybackDelegate {
         })
     }
 
-    func play(completion: (() -> Void)? = nil, userInitiated: Bool = true) {
-        guard let currEpisode = currentEpisode else { return }
+    func play(completion: (() -> Void)? = nil, failure: (() -> Void)? = nil, userInitiated: Bool = true) {
+        guard let currEpisode = currentEpisode else {
+            failure?()
+            return
+        }
+
+        let backgroundPlayback = BackgroundPlayback.current
+        guard backgroundPlayback?.isCancelled != true, backgroundPlayback.map({ $0.remainingTime > 0 }) ?? true else {
+            failure?()
+            return
+        }
+        if backgroundPlayback == nil { playbackStarts.cancelBounded() }
 
         FileLog.shared.addMessage("PlaybackManager Play \(currEpisode.title ?? "unknown episode") userInitiated: \(userInitiated)")
 
@@ -311,45 +356,141 @@ class PlaybackManager: ServerPlaybackDelegate {
             hasReportedSourceResolved.value = true
         }
 
+        let request = playbackStarts.begin(completion: completion, failure: failure)
+        guard let startingPlayer = player else {
+            aboutToPlay.value = false
+            request.finish(success: false)
+            return
+        }
+
+        if let backgroundPlayback {
+            let stop: () -> Void = { [weak self, weak startingPlayer] in
+                guard let self, let startingPlayer, self.player === startingPlayer else { return }
+                startingPlayer.pause()
+                self.aboutToPlay.value = false
+                if shouldReportSourceResolved { self.hasReportedSourceResolved.value = false }
+            }
+            request.startTimeout(after: backgroundPlayback.remainingTime, onTimeout: stop)
+            backgroundPlayback.onCancel { [weak request] in
+                Task { @MainActor in
+                    guard let request, request.isPending else { return }
+                    stop()
+                    request.finish(success: false)
+                }
+            }
+        }
+
         activateAudioSession(completion: { activated in
+            guard request.isPending, self.player === startingPlayer else {
+                request.finish(success: false)
+                return
+            }
             if !activated {
                 self.aboutToPlay.value = false
                 // Playback didn't start, so allow a later retry to report the resolved source.
                 if shouldReportSourceResolved {
                     self.hasReportedSourceResolved.value = false
                 }
+                request.finish(success: false)
                 return
             }
 
-            self.player?.play {
-                completion?()
-            }
-            self.startUpdateTimer()
-            self.updateCommandCenterSkipTimes(addTarget: false)
-            self.updateExtraActions()
-
-            NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackStarted)
-
-            // Report the source the player resolved now that playback has actually started, once per
-            // player (resumes/seeks reuse the same player and don't re-report). Only report if the
-            // current episode still matches the one we started: activation can run async, and if the
-            // user has since switched episodes the new play cycle reports its own resolved source.
-            if shouldReportSourceResolved, self.currentEpisode?.uuid == currEpisode.uuid {
-                self.analyticsPlaybackHelper.playbackSourceResolved(for: currEpisode)
+            guard let player = self.player else {
+                self.aboutToPlay.value = false
+                if shouldReportSourceResolved {
+                    self.hasReportedSourceResolved.value = false
+                }
+                request.finish(success: false)
+                return
             }
 
-            if currEpisode.videoPodcast() {
-                self.setAudioSessionVideoProperties()
+            let playbackStarted: () -> Void = {
+                Task { @MainActor in
+                    guard request.isPending, self.player === startingPlayer else {
+                        request.finish(success: false)
+                        return
+                    }
+                    self.startUpdateTimer()
+                    self.updateCommandCenterSkipTimes(addTarget: false)
+                    self.updateExtraActions()
+
+                    NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackStarted)
+
+                    // Report the source the player resolved now that playback has actually started, once per
+                    // player (resumes/seeks reuse the same player and don't re-report). Only report if the
+                    // current episode still matches the one we started: activation can run async, and if the
+                    // user has since switched episodes the new play cycle reports its own resolved source.
+                    if shouldReportSourceResolved, self.currentEpisode?.uuid == currEpisode.uuid {
+                        self.analyticsPlaybackHelper.playbackSourceResolved(for: currEpisode)
+                    }
+
+                    if currEpisode.videoPodcast() {
+                        self.setAudioSessionVideoProperties()
+                    }
+
+                    self.updateIdleTimer()
+
+                    self.sleepTimerManager.restartSleepTimerIfNeeded()
+                    self.syncSleepTimerLiveActivity(isPaused: false)
+                    request.finish(success: true)
+                }
+            }
+            let playbackFailed: () -> Void = {
+                Task { @MainActor in
+                    guard request.isPending, self.player === startingPlayer else {
+                        request.finish(success: false)
+                        return
+                    }
+                    self.aboutToPlay.value = false
+                    if shouldReportSourceResolved {
+                        self.hasReportedSourceResolved.value = false
+                    }
+                    request.finish(success: false)
+                }
             }
 
-            self.updateIdleTimer()
-
-            self.sleepTimerManager.restartSleepTimerIfNeeded()
-            self.syncSleepTimerLiveActivity(isPaused: false)
+            #if !os(watchOS) && !os(tvOS)
+            if let effectsPlayer = player as? EffectsPlayer {
+                effectsPlayer.play(
+                    completion: playbackStarted,
+                    failure: playbackFailed,
+                    fallback: { error in
+                        Task { @MainActor in
+                            guard request.isPending, self.player === startingPlayer else { return }
+                            BackgroundPlayback.$current.withValue(backgroundPlayback) {
+                                self.playbackDidFail(
+                                    error: error,
+                                    fallbackToDefaultPlayer: true,
+                                    completion: { request.finish(success: true) },
+                                    failure: { request.finish(success: false) }
+                                )
+                            }
+                        }
+                    }
+                )
+                return
+            }
+            #endif
+            if let defaultPlayer = player as? DefaultPlayer {
+                defaultPlayer.play(completion: playbackStarted, failure: playbackFailed, retry: { [weak self, weak startingPlayer] episodeUuid in
+                    guard let self, let startingPlayer, self.player === startingPlayer else { return false }
+                    return BackgroundPlayback.$current.withValue(backgroundPlayback) {
+                        self.retryUrlLoad(
+                            for: episodeUuid,
+                            completion: { request.finish(success: true) },
+                            failure: { request.finish(success: false) }
+                        )
+                    }
+                })
+            } else {
+                player.play(completion: playbackStarted, failure: playbackFailed)
+            }
         })
     }
 
     func pause(userInitiated: Bool = true) {
+        playbackStarts.cancel()
+        aboutToPlay.value = false
         guard let episode = currentEpisode else { return }
 
         // Only trigger the event if we are already playing
@@ -731,6 +872,7 @@ class PlaybackManager: ServerPlaybackDelegate {
     }
 
     private func playNextEpisode(autoPlay: Bool) {
+        playbackStarts.cancel()
         let queueCount = queue.upNextCount()
         if queueCount == 0 { return }
 
@@ -946,6 +1088,7 @@ class PlaybackManager: ServerPlaybackDelegate {
     }
 
     func endPlayback(saveCurrentEpisode: Bool = true) {
+        playbackStarts.cancel()
         cancelUpdateTimer()
         cancelSleepTimer()
         chapterManager.clearChapterInfo()
@@ -1298,7 +1441,12 @@ class PlaybackManager: ServerPlaybackDelegate {
 
     private(set) var activeError: PlaybackError?
 
-    func playbackDidFail(error: PlaybackError, fallbackToDefaultPlayer: Bool = false) {
+    func playbackDidFail(
+        error: PlaybackError,
+        fallbackToDefaultPlayer: Bool = false,
+        completion: (() -> Void)? = nil,
+        failure: (() -> Void)? = nil
+    ) {
         FileLog.shared.addMessage("[PlaybackManager] Playback did fail with error: \(error.logMessage ?? "No error detail provided")")
 
         AnalyticsPlaybackHelper.shared.playbackFailed(episode: currentEpisode, error: error.logMessage ?? "Unknown", hlsErrorDetail: error.analyticsDetail, player: player)
@@ -1309,12 +1457,24 @@ class PlaybackManager: ServerPlaybackDelegate {
 
             fallbackToPlayer = DefaultPlayer.self
 
-            load(episode: episode, autoPlay: true, overrideUpNext: false) { [weak self] in
-                self?.fallbackToPlayer = nil
-            }
+            load(
+                episode: episode,
+                autoPlay: true,
+                overrideUpNext: false,
+                completion: { [weak self] in
+                    self?.fallbackToPlayer = nil
+                    completion?()
+                },
+                failure: { [weak self] in
+                    self?.fallbackToPlayer = nil
+                    failure?()
+                }
+            )
             return
         }
         #endif
+
+        defer { failure?() }
 
         guard let episode = currentEpisode else {
             FileLog.shared.addMessage("[PlaybackManager] Failed to fetch current episode. Queue will be cleared.")
@@ -2442,6 +2602,11 @@ class PlaybackManager: ServerPlaybackDelegate {
             backgroundTask = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
                 guard let strongSelf = self else { return }
 
+                if strongSelf.playbackStarts.hasBoundedPending {
+                    strongSelf.player?.pause()
+                    strongSelf.playbackStarts.cancelBounded()
+                    strongSelf.aboutToPlay.value = false
+                }
                 strongSelf.endBackgroundTask()
             })
         #endif
@@ -2596,7 +2761,7 @@ class PlaybackManager: ServerPlaybackDelegate {
     // Authors can change URLs at any time, so this is handy to fix cases where they post
     // the wrong one and update it later
     // This method returns false if no retry is done, because we already did it before.
-    func retryUrlLoad(for episodeUuid: String) -> Bool {
+    func retryUrlLoad(for episodeUuid: String, completion: (() -> Void)? = nil, failure: (() -> Void)? = nil) -> Bool {
 
         guard lastRetryEpisodeUuid != episodeUuid,
               let episode = DataManager.sharedManager.findEpisode(uuid: episodeUuid),
@@ -2604,18 +2769,31 @@ class PlaybackManager: ServerPlaybackDelegate {
             lastRetryEpisodeUuid = episodeUuid
             return false
         }
-        Task {
-            haveCalledPlayerLoad = false
+        let generation = playbackStarts.generation
+        let backgroundPlayback = BackgroundPlayback.current
+        BackgroundPlayback.performOnMainActor(in: backgroundPlayback) {
+            guard BackgroundPlayback.canContinue,
+                  self.playbackStarts.generation == generation,
+                  self.currentEpisode?.uuid == episodeUuid else {
+                failure?()
+                return
+            }
+            self.haveCalledPlayerLoad = false
             FileLog.shared.addMessage("PlaybackManager: URL failed to load, trying to update episode and playing again")
-            lastRetryEpisodeUuid = episodeUuid
+            self.lastRetryEpisodeUuid = episodeUuid
 
             ServerPodcastManager.shared.updatePodcastIfRequired(podcast: podcast) { [weak self] wasUpdated in
-                guard let self,
-                      let updatedEpisode = wasUpdated ? DataManager.sharedManager.findEpisode(uuid: episodeUuid) : episode else { return }
-
-                FileLog.shared.addMessage("PlaybackManager: Episode\(wasUpdated ? " " : " not") updated, trying to play again.")
-
-                load(episode: updatedEpisode, autoPlay: true, overrideUpNext: false)
+                BackgroundPlayback.performOnMainActor(in: backgroundPlayback) {
+                    guard let self, BackgroundPlayback.canContinue,
+                          self.playbackStarts.generation == generation,
+                          self.currentEpisode?.uuid == episodeUuid,
+                          let updatedEpisode = wasUpdated ? DataManager.sharedManager.findEpisode(uuid: episodeUuid) : episode else {
+                        failure?()
+                        return
+                    }
+                    FileLog.shared.addMessage("PlaybackManager: Episode\(wasUpdated ? " " : " not") updated, trying to play again.")
+                    self.load(episode: updatedEpisode, autoPlay: true, overrideUpNext: false, completion: completion, failure: failure)
+                }
             }
         }
         return true

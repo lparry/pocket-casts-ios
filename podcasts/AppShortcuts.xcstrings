@@ -84,6 +84,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延长睡眠计时器" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延長睡眠計時器" } }
       }
+    },
+    "${applicationName}: Resume" : {
+      "comment" : "Phrase for running the resume playback App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reprèn" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Fortsetzen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Resume" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reanudar" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reanudar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Reprendre" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Reprendre" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Riprendi" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で再開" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Hervatten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Retomar" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Возобновить" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Återuppta" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：恢复" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：繼續播放" } }
+      }
+    },
+    "Continue playing in ${applicationName}" : {
+      "comment" : "Phrase for running the resume playback App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continua reproduint" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Weiterspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Continue playing in ${applicationName}" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuar reproduciendo" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuar reproduciendo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuer la lecture" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuer la lecture" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continua la riproduzione" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で再生を続ける" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: doorgaan met afspelen" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuar reprodução" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: продолжить воспроизведение" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: fortsätt spela" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：继续播放" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：繼續播放" } }
+      }
     }
   },
   "version" : "1.0"

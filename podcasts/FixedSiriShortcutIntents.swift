@@ -2,21 +2,64 @@ import AppIntents
 
 enum FixedSiriShortcutAction: Equatable {
     case extendSleepTimer(minutes: Int)
+    case resumePlayback
+}
+
+enum FixedSiriShortcutActionResult: Equatable {
+    case success
+    case unavailable
+    case playbackFailed
+}
+
+@MainActor
+protocol FixedSiriShortcutPlaybackStarting {
+    var hasCurrentEpisode: Bool { get }
+
+    func startPlayback() async -> FixedSiriShortcutActionResult
+}
+
+extension PlaybackManager: FixedSiriShortcutPlaybackStarting {
+    var hasCurrentEpisode: Bool {
+        currentEpisode != nil
+    }
+
+    func startPlayback() async -> FixedSiriShortcutActionResult {
+        // Keep a background App Intent alive until asynchronous audio-session and player setup finishes.
+        await withCheckedContinuation { continuation in
+            play(
+                completion: { continuation.resume(returning: .success) },
+                failure: { continuation.resume(returning: .playbackFailed) }
+            )
+        }
+    }
 }
 
 @MainActor
 protocol FixedSiriShortcutActionPerforming {
     @discardableResult
-    func perform(_ action: FixedSiriShortcutAction) async -> Bool
+    func perform(_ action: FixedSiriShortcutAction) async -> FixedSiriShortcutActionResult
 }
 
 extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
     @discardableResult
-    func perform(_ action: FixedSiriShortcutAction) async -> Bool {
-        switch action {
-        case let .extendSleepTimer(minutes):
-            return extendSleepTimer(addTime: minutes)
+    func perform(_ action: FixedSiriShortcutAction) async -> FixedSiriShortcutActionResult {
+        await BackgroundPlayback.run {
+            switch action {
+            case let .extendSleepTimer(minutes):
+                return extendSleepTimer(addTime: minutes) ? .success : .unavailable
+            case .resumePlayback:
+                return await resumePlayback(using: PlaybackManager.shared)
+            }
         }
+    }
+
+    @MainActor
+    func resumePlayback(using playbackStarter: any FixedSiriShortcutPlaybackStarting) async -> FixedSiriShortcutActionResult {
+        AnalyticsHelper.siriResume()
+        guard playbackStarter.hasCurrentEpisode else { return .unavailable }
+
+        AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+        return await playbackStarter.startPlayback()
     }
 }
 
@@ -38,6 +81,62 @@ enum ExtendSleepTimerIntentError: LocalizedError, Equatable {
                 defaultValue: "The number of minutes must be between 1 and 300.",
                 table: "AppIntents"
             )
+        }
+    }
+}
+
+enum ResumePlaybackIntentError: LocalizedError, Equatable {
+    case noEpisode
+    case playbackFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .noEpisode:
+            String(
+                localized: "siri_shortcut_resume_playback_no_episode_error",
+                defaultValue: "There’s no episode to resume.",
+                table: "AppIntents"
+            )
+        case .playbackFailed:
+            L10n.podcastDetailsPlaybackError
+        }
+    }
+}
+
+struct ResumePlaybackIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_resume_title",
+        defaultValue: "Resume Current Episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_resume_playback_description",
+            defaultValue: "Resumes playback in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        switch await actionPerformer.perform(.resumePlayback) {
+        case .success:
+            return
+        case .unavailable:
+            throw ResumePlaybackIntentError.noEpisode
+        case .playbackFailed:
+            throw ResumePlaybackIntentError.playbackFailed
         }
     }
 }
@@ -94,7 +193,7 @@ struct ExtendSleepTimerIntent: AudioPlaybackIntent, CustomIntentMigratedAppInten
 
     @MainActor
     func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
-        guard await actionPerformer.perform(.extendSleepTimer(minutes: try resolvedMinutes())) else {
+        guard await actionPerformer.perform(.extendSleepTimer(minutes: try resolvedMinutes())) == .success else {
             throw ExtendSleepTimerIntentError.noActiveTimer
         }
     }

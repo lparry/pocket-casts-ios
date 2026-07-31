@@ -3628,9 +3628,9 @@ Aqui está um passe de convidado de %1$@ para o Pocket Casts Plus, meu reproduto
     <key>siri_shortcut_previous_chapter</key>
     <string>Capítulo anterior</string>
     <key>siri_shortcut_resume_phrase</key>
-    <string>Continuar</string>
+    <string>Retomar</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Continuando episódio atual</string>
+    <string>Retomar episódio atual</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Criar atalho para o podcast</string>
     <key>skip_back</key>

@@ -6,6 +6,13 @@ class GoogleCastPlayer: PlaybackProtocol {
     private lazy var castManager: GoogleCastManager = .sharedManager
 
     private var shouldKeepPlaying = false
+    private var episode: BaseEpisode?
+    private var needsLoad = false
+    private let reportPlaybackError: (PlaybackManager.PlaybackError) -> Void
+
+    init(reportPlaybackError: @escaping (PlaybackManager.PlaybackError) -> Void = { PlaybackManager.shared.playbackDidFail(error: $0) }) {
+        self.reportPlaybackError = reportPlaybackError
+    }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -14,12 +21,10 @@ class GoogleCastPlayer: PlaybackProtocol {
     // MARK: - PlaybackProtocol impl
 
     func loadEpisode(_ episode: BaseEpisode) {
-        if let episode = episode as? UserEpisode, !episode.uploaded() {
-            PlaybackManager.shared.playbackDidFail(error: .chromecastError(logMessage: "Unable to cast local file"))
-            return
-        }
-        shouldKeepPlaying = true
-        castManager.playSingleEpisode(episode)
+        castManager.cancelPlaybackStart()
+        shouldKeepPlaying = false
+        self.episode = episode
+        needsLoad = true
     }
 
     func isReadyToPlay() -> Bool {
@@ -38,12 +43,31 @@ class GoogleCastPlayer: PlaybackProtocol {
         duration() - currentTime()
     }
 
-    func play(completion: (() -> Void)?) {
+    func play(completion: (() -> Void)?, failure: (() -> Void)?) {
+        guard let episode else {
+            failure?()
+            return
+        }
+        if let userEpisode = episode as? UserEpisode, !userEpisode.uploaded() {
+            reportPlaybackError(.chromecastError(logMessage: "Unable to cast local file"))
+            failure?()
+            return
+        }
         shouldKeepPlaying = true
-        castManager.play()
-        completion?()
-
-        PlaybackManager.shared.playerDidFinishPreparing()
+        let started: () -> Void = { [weak self] in
+            self?.needsLoad = false
+            PlaybackManager.shared.playerDidFinishPreparing()
+            completion?()
+        }
+        let failed: () -> Void = { [weak self] in
+            self?.shouldKeepPlaying = false
+            failure?()
+        }
+        if needsLoad {
+            castManager.playSingleEpisode(episode, completion: started, failure: failed)
+        } else {
+            castManager.play(episodeUuid: episode.uuid, completion: started, failure: failed)
+        }
     }
 
     func pause() {
@@ -79,6 +103,7 @@ class GoogleCastPlayer: PlaybackProtocol {
     }
 
     func endPlayback(permanent: Bool) {
+        castManager.cancelPlaybackStart()
         shouldKeepPlaying = false
         if permanent {
             castManager.endPlayback()

@@ -3628,7 +3628,7 @@ Pocket Casts を最大限に活用しましょう。</string>
     <key>siri_shortcut_previous_chapter</key>
     <string>前のチャプター</string>
     <key>siri_shortcut_resume_phrase</key>
-    <string>再有効化</string>
+    <string>再開</string>
     <key>siri_shortcut_resume_title</key>
     <string>現在のエピソードを再開</string>
     <key>siri_shortcut_to_podcast</key>

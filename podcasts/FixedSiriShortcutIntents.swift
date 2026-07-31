@@ -9,6 +9,7 @@ enum FixedSiriShortcutAction: Equatable {
     case playUpNext
     case playSuggested
     case nextChapter
+    case previousChapter
 }
 
 enum FixedSiriShortcutActionResult: Equatable {
@@ -110,6 +111,23 @@ extension PlaybackManager: FixedSiriShortcutNextChapterPlaying {
 }
 
 @MainActor
+protocol FixedSiriShortcutPreviousChapterPlaying {
+    func startPreviousChapter() async -> FixedSiriShortcutActionResult
+}
+
+extension PlaybackManager: FixedSiriShortcutPreviousChapterPlaying {
+    func startPreviousChapter() async -> FixedSiriShortcutActionResult {
+        await withCheckedContinuation { continuation in
+            skipToPreviousChapter(
+                startPlaybackAfterSkip: true,
+                completion: { continuation.resume(returning: .success) },
+                failure: { continuation.resume(returning: .unavailable) }
+            )
+        }
+    }
+}
+
+@MainActor
 protocol FixedSiriShortcutActionPerforming {
     @discardableResult
     func perform(_ action: FixedSiriShortcutAction) async -> FixedSiriShortcutActionResult
@@ -132,6 +150,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
                 return await playSuggestedAsync()
             case .nextChapter:
                 return await skipToNextChapter(using: PlaybackManager.shared)
+            case .previousChapter:
+                return await skipToPreviousChapter(using: PlaybackManager.shared)
             }
         }
     }
@@ -155,6 +175,12 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
     func skipToNextChapter(using chapterPlayer: any FixedSiriShortcutNextChapterPlaying) async -> FixedSiriShortcutActionResult {
         AnalyticsHelper.siriChapterChanged()
         return await chapterPlayer.startNextChapter()
+    }
+
+    @MainActor
+    func skipToPreviousChapter(using chapterPlayer: any FixedSiriShortcutPreviousChapterPlaying) async -> FixedSiriShortcutActionResult {
+        AnalyticsHelper.siriChapterChanged()
+        return await chapterPlayer.startPreviousChapter()
     }
 }
 
@@ -244,6 +270,18 @@ enum NextChapterIntentError: LocalizedError, Equatable {
         String(
             localized: "siri_shortcut_next_chapter_unavailable_error",
             defaultValue: "Unable to skip to the next chapter.",
+            table: "AppIntents"
+        )
+    }
+}
+
+enum PreviousChapterIntentError: LocalizedError, Equatable {
+    case unavailable
+
+    var errorDescription: String? {
+        String(
+            localized: "siri_shortcut_previous_chapter_unavailable_error",
+            defaultValue: "Unable to skip to the previous chapter.",
             table: "AppIntents"
         )
     }
@@ -438,6 +476,39 @@ struct NextChapterIntent: AudioPlaybackIntent {
     func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
         guard await actionPerformer.perform(.nextChapter) == .success else {
             throw NextChapterIntentError.unavailable
+        }
+    }
+}
+
+struct PreviousChapterIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_previous_chapter",
+        defaultValue: "Previous chapter",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_previous_chapter_description",
+            defaultValue: "Skips to the previous chapter in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        guard await actionPerformer.perform(.previousChapter) == .success else {
+            throw PreviousChapterIntentError.unavailable
         }
     }
 }

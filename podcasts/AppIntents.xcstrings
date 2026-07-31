@@ -399,6 +399,48 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法跳到下一章。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法跳到下一章。" } }
       }
+    },
+    "siri_shortcut_previous_chapter_description" : {
+      "comment" : "Description for the App Intent that skips to the previous chapter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítol anterior a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Springt zum vorherigen Kapitel in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skips to the previous chapter in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo anterior en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo anterior en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre précédent dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre précédent dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Passa al capitolo precedente in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで前のチャプターに移動します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Gaat naar het vorige hoofdstuk in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pula para o capítulo anterior no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переходит к предыдущей главе в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Hoppar till föregående kapitel i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到上一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到上一章。" } }
+      }
+    },
+    "siri_shortcut_previous_chapter_unavailable_error" : {
+      "comment" : "Error shown when the Previous Chapter App Intent cannot skip to another chapter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No es pot saltar al capítol anterior." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zum vorherigen Kapitel kann nicht gesprungen werden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to skip to the previous chapter." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se puede saltar al capítulo anterior." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No se puede saltar al capítulo anterior." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de passer au chapitre précédent." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de passer au chapitre précédent." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Impossibile passare al capitolo precedente." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "前のチャプターにスキップできません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Kan niet naar het vorige hoofdstuk gaan." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não foi possível pular para o capítulo anterior." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Не удалось перейти к предыдущей главе." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det gick inte att hoppa till föregående kapitel." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法跳到上一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法跳到上一章。" } }
+      }
     }
   },
   "version" : "1.0"

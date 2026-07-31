@@ -570,14 +570,26 @@ class PlaybackManager: ServerPlaybackDelegate {
         StatsManager.shared.addSkippedTime(amount)
     }
 
-    func skipToPreviousChapter(startPlaybackAfterSkip: Bool = false) {
-        guard let previousChapter = chapterManager.previousVisibleChapter() else { return }
+    func skipToPreviousChapter(
+        startPlaybackAfterSkip: Bool = false,
+        completion: (() -> Void)? = nil,
+        failure: (() -> Void)? = nil
+    ) {
+        guard let previousChapter = chapterManager.previousVisibleChapter() else {
+            failure?()
+            return
+        }
 
         if abs(currentChapters().index - previousChapter.index) > 1 {
             trackChapterSkipped()
         }
 
-        seekTo(time: ceil(previousChapter.startTime.seconds), startPlaybackAfterSeek: startPlaybackAfterSkip)
+        seekTo(
+            time: ceil(previousChapter.startTime.seconds),
+            startPlaybackAfterSeek: startPlaybackAfterSkip,
+            completion: completion,
+            failure: failure
+        )
     }
 
     func skipToNextChapter(

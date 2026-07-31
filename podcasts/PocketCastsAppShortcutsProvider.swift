@@ -87,5 +87,15 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "forward.end.fill"
         )
+        AppShortcut(
+            intent: PreviousChapterIntent(),
+            phrases: ["\(.applicationName): Previous chapter"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_previous_chapter",
+                defaultValue: "Previous chapter",
+                table: "Localizable"
+            ),
+            systemImageName: "backward.end.fill"
+        )
     }
 }

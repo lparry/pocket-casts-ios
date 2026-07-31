@@ -471,6 +471,48 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
         XCTAssertEqual(started, .unavailable)
         XCTAssertEqual(chapterPlayer.startNextChapterCallCount, 1)
     }
+
+    @MainActor
+    func testPreviousChapterPerformsPreviousChapterAction() async throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try await PreviousChapterIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.previousChapter])
+    }
+
+    @MainActor
+    func testPreviousChapterReportsUnavailableAction() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(result: .unavailable)
+
+        do {
+            try await PreviousChapterIntent().perform(using: performer)
+            XCTFail("Expected Previous Chapter to report an unavailable action")
+        } catch {
+            XCTAssertEqual(error as? PreviousChapterIntentError, .unavailable)
+        }
+        XCTAssertEqual(performer.performedActions, [.previousChapter])
+    }
+
+    @MainActor
+    func testPreviousChapterWaitsForSeekAndPlayback() async {
+        let chapterPlayer = RecordingFixedSiriShortcutPreviousChapterPlayer(playbackStarted: true)
+
+        let started = await SiriShortcutsManager.shared.skipToPreviousChapter(using: chapterPlayer)
+
+        XCTAssertEqual(started, .success)
+        XCTAssertEqual(chapterPlayer.startPreviousChapterCallCount, 1)
+    }
+
+    @MainActor
+    func testPreviousChapterReportsSeekOrPlaybackFailure() async {
+        let chapterPlayer = RecordingFixedSiriShortcutPreviousChapterPlayer(playbackStarted: false)
+
+        let started = await SiriShortcutsManager.shared.skipToPreviousChapter(using: chapterPlayer)
+
+        XCTAssertEqual(started, .unavailable)
+        XCTAssertEqual(chapterPlayer.startPreviousChapterCallCount, 1)
+    }
 }
 
 @MainActor
@@ -564,6 +606,21 @@ private final class RecordingFixedSiriShortcutNextChapterPlayer: FixedSiriShortc
 
     func startNextChapter() async -> FixedSiriShortcutActionResult {
         startNextChapterCallCount += 1
+        return playbackStarted ? .success : .unavailable
+    }
+}
+
+@MainActor
+private final class RecordingFixedSiriShortcutPreviousChapterPlayer: FixedSiriShortcutPreviousChapterPlaying {
+    private let playbackStarted: Bool
+    private(set) var startPreviousChapterCallCount = 0
+
+    init(playbackStarted: Bool) {
+        self.playbackStarted = playbackStarted
+    }
+
+    func startPreviousChapter() async -> FixedSiriShortcutActionResult {
+        startPreviousChapterCallCount += 1
         return playbackStarted ? .success : .unavailable
     }
 }

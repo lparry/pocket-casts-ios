@@ -105,6 +105,111 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设置睡眠计时器" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "設定睡眠計時器" } }
       }
+    },
+    "siri_shortcut_extend_sleep_timer_description" : {
+      "comment" : "Description of the Extend Sleep Timer app intent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Amplia el temporitzador els minuts que triïs." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Verlängert die Schlummerfunktion um eine ausgewählte Anzahl von Minuten." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extends the sleep timer by a chosen number of minutes." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Amplía el temporizador el número de minutos que elijas." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Extiende el temporizador de suspensión los minutos que elijas." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Retarde la mise en veille du nombre de minutes choisi." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Prolonge la minuterie de veille du nombre de minutes choisi." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Ritarda l'autospegnimento del numero di minuti scelto." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スリープタイマーを選択した分数だけ延長します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Verlengt de slaaptimer met een gekozen aantal minuten." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Prolonga o temporizador pelo número de minutos escolhido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отложить таймер сна на выбранное количество минут." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Förlänger insomningstimern med valfritt antal minuter." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将睡眠计时器延长所选的分钟数。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "將睡眠計時器延長所選的分鐘數。" } }
+      }
+    },
+    "siri_shortcut_extend_sleep_timer_invalid_minutes_error" : {
+      "comment" : "Error shown when the extend sleep timer App Intent is given a number of minutes outside the supported range.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "El nombre de minuts ha d'estar entre 1 i 300." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die Anzahl der Minuten muss zwischen 1 und 300 liegen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The number of minutes must be between 1 and 300." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "El número de minutos debe estar entre 1 y 300." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "El número de minutos debe estar entre 1 y 300." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Le nombre de minutes doit être compris entre 1 et 300." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Le nombre de minutes doit être compris entre 1 et 300." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Il numero di minuti deve essere compreso tra 1 e 300." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "分数は1〜300の間で指定してください。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Het aantal minuten moet tussen 1 en 300 liggen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O número de minutos deve estar entre 1 e 300." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Количество минут должно быть от 1 до 300." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Antalet minuter måste vara mellan 1 och 300." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分钟数必须介于 1 到 300 之间。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分鐘數必須介於 1 到 300 之間。" } }
+      }
+    },
+    "siri_shortcut_extend_sleep_timer_minutes_title" : {
+      "comment" : "Title for the number of minutes parameter in the extend sleep timer App Intent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Minuts" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Minuten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Minuti" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "分" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Minuten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Минуты" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Minuter" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分鐘" } }
+      }
+    },
+    "siri_shortcut_extend_sleep_timer_no_active_timer_error" : {
+      "comment" : "Error shown when the extend sleep timer App Intent runs while no sleep timer is active.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap temporitzador actiu per ampliar." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Es gibt keine aktive Schlummerfunktion zum Verlängern." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no active sleep timer to extend." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún temporizador activo que ampliar." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún temporizador de suspensión activo que extender." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune mise en veille active à retarder." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucune minuterie de veille active à prolonger." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non c’è nessun autospegnimento attivo da ritardare." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "延長できる実行中のスリープタイマーがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is geen actieve slaaptimer om te verlengen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há temporizador ativo para prolongar." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет активного таймера сна, который можно отложить." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns ingen aktiv insomningstimer att förlänga." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前没有可延长的睡眠计时器。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前沒有可延長的睡眠計時器。" } }
+      }
+    },
+    "siri_shortcut_extend_sleep_timer_parameter_summary" : {
+      "comment" : "Summary for the App Intent that extends the sleep timer. ${minutes} is the number of minutes to add.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Ampliar el temporitzador ${minutes} minuts" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Schlummerfunktion um ${minutes} Minuten verlängern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extend Sleep Timer by ${minutes} mins" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ampliar temporizador en ${minutes} minutos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Extender temporizador de suspensión ${minutes} minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Retarder la mise en veille de ${minutes} minutes" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Prolonger la minuterie de veille de ${minutes} min" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Ritarda l'autospegnimento di ${minutes} minuti" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スリープタイマーを${minutes}分延長" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Slaaptimer verlengen met ${minutes} minuten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Prolongar o temporizador em ${minutes} minutos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отложить таймер сна на ${minutes} мин." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Förläng Insomningstimer med ${minutes} Minuter" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将睡眠计时器延长 ${minutes} 分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "將睡眠計時器延長 ${minutes} 分鐘" } }
+      }
     }
   },
   "version" : "1.0"

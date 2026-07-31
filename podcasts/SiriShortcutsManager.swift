@@ -441,8 +441,7 @@ class SiriShortcutsManager: CustomObserver {
         guard let minutes = TimeInterval(exactly: addTime) else { return false }
         let sixtySeconds: TimeInterval = 1.minutes
         let addSeconds = sixtySeconds * minutes
-        PlaybackManager.shared.extendSleepTimer(by: addSeconds, source: .siri)
-        return true
+        return PlaybackManager.shared.extendSleepTimer(by: addSeconds, source: .siri)
     }
 
     func playFilter(uuid: String) -> INPlayMediaIntentResponseCode {

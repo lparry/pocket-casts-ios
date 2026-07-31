@@ -33,7 +33,6 @@
 				<string>ChapterIntent</string>
 				<string>INPlayMediaIntent</string>
 				<string>SJChapterIntent</string>
-				<string>SJExtendSleepTimerIntent</string>
 				<string>SJOpenFilterIntent</string>
 			</array>
 			<key>SupportedMediaCategories</key>

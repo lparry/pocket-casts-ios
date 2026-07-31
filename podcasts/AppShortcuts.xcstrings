@@ -252,6 +252,25 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：下一章" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：下一章" } }
       }
+    },
+    "${applicationName}: Previous chapter" : {
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítol anterior" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Vorheriges Kapitel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Previous chapter" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo anterior" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo anterior" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre précédent" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre précédent" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capitolo precedente" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で前のチャプター" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Eerder hoofdstuk" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo anterior" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Предыдущая глава" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Föregående kapitel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：上一章" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：上一章" } }
+      }
     }
   },
   "version" : "1.0"

@@ -6,6 +6,7 @@ enum FixedSiriShortcutAction: Equatable {
     case pausePlayback
     case playUpNext
     case playSuggested
+    case nextChapter
 }
 
 @MainActor
@@ -28,6 +29,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
             return playUpNext() == .success
         case .playSuggested:
             return await playSuggestedAsync() == .success
+        case .nextChapter:
+            return skipToNextChapter() == .success
         }
     }
 }
@@ -204,6 +207,37 @@ struct PlaySuggestedIntent: AudioPlaybackIntent {
         guard await actionPerformer.perform(.playSuggested) else {
             throw PlaySuggestedIntentError.unavailable
         }
+    }
+}
+
+struct NextChapterIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_next_chapter",
+        defaultValue: "Next chapter",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_next_chapter_description",
+            defaultValue: "Skips to the next chapter in Pocket Casts.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async {
+        await actionPerformer.perform(.nextChapter)
     }
 }
 

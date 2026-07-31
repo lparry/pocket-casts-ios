@@ -294,6 +294,27 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目前没有可播放的推荐单集。" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前沒有可播放的推薦單集。" } }
       }
+    },
+    "siri_shortcut_next_chapter_description" : {
+      "comment" : "Description for the App Intent that skips to the next chapter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítol següent a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Springt zum nächsten Kapitel in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skips to the next chapter in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo siguiente en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Salta al próximo capítulo en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre suivant dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre suivant dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Passa al capitolo successivo in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで次のチャプターに移動します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Gaat naar het volgende hoofdstuk in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pula para o próximo capítulo no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переходит к следующей главе в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Hoppar till nästa kapitel i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到下一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到下一章。" } }
+      }
     }
   },
   "version" : "1.0"

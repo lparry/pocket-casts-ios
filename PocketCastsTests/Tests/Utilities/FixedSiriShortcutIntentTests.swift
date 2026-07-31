@@ -103,6 +103,15 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
         }
         XCTAssertEqual(performer.performedActions, [.playSuggested])
     }
+
+    @MainActor
+    func testNextChapterPerformsNextChapterAction() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        await NextChapterIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.nextChapter])
+    }
 }
 
 @MainActor

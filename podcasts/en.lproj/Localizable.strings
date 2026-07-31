@@ -3250,6 +3250,9 @@
 /* Siri shortcut title for playing the next episode in the queue */
 "siri_shortcut_play_up_next_title" = "Playing next episode";
 
+/* Title of the Play Up Next App Intent shown in the Shortcuts app */
+"siri_shortcut_play_up_next_intent_title" = "Play Next Episode";
+
 /* Siri shortcut invocation phrase for playing the next episode in the queue. */
 "siri_shortcut_play_up_next_phrase" = "Up Next";
 

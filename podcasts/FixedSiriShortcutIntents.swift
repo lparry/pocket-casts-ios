@@ -4,6 +4,7 @@ enum FixedSiriShortcutAction: Equatable {
     case extendSleepTimer(minutes: Int)
     case resumePlayback
     case pausePlayback
+    case playUpNext
 }
 
 enum FixedSiriShortcutActionResult: Equatable {
@@ -45,6 +46,28 @@ protocol FixedSiriShortcutPlaybackPausing {
 extension PlaybackManager: FixedSiriShortcutPlaybackPausing {}
 
 @MainActor
+protocol FixedSiriShortcutUpNextPlaying {
+    func startNextEpisode() async -> FixedSiriShortcutActionResult
+}
+
+extension PlaybackManager: FixedSiriShortcutUpNextPlaying {
+    func startNextEpisode() async -> FixedSiriShortcutActionResult {
+        guard let currentEpisode, queue.upNextCount() > 0 else { return .unavailable }
+
+        return await withCheckedContinuation { continuation in
+            removeIfPlayingOrQueued(
+                episode: currentEpisode,
+                fireNotification: true,
+                userInitiated: true,
+                autoPlay: true,
+                completion: { continuation.resume(returning: .success) },
+                failure: { continuation.resume(returning: .playbackFailed) }
+            )
+        }
+    }
+}
+
+@MainActor
 protocol FixedSiriShortcutActionPerforming {
     @discardableResult
     func perform(_ action: FixedSiriShortcutAction) async -> FixedSiriShortcutActionResult
@@ -61,6 +84,8 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
                 return await resumePlayback(using: PlaybackManager.shared)
             case .pausePlayback:
                 return pausePlayback(using: PlaybackManager.shared) == .success ? .success : .unavailable
+            case .playUpNext:
+                return await playUpNext(using: PlaybackManager.shared)
             }
         }
     }
@@ -72,6 +97,12 @@ extension SiriShortcutsManager: FixedSiriShortcutActionPerforming {
 
         AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
         return await playbackStarter.startPlayback()
+    }
+
+    @MainActor
+    func playUpNext(using upNextPlayer: any FixedSiriShortcutUpNextPlaying) async -> FixedSiriShortcutActionResult {
+        AnalyticsHelper.siriUpNext()
+        return await upNextPlayer.startNextEpisode()
     }
 }
 
@@ -107,6 +138,24 @@ enum ResumePlaybackIntentError: LocalizedError, Equatable {
             String(
                 localized: "siri_shortcut_resume_playback_no_episode_error",
                 defaultValue: "There’s no episode to resume.",
+                table: "AppIntents"
+            )
+        case .playbackFailed:
+            L10n.podcastDetailsPlaybackError
+        }
+    }
+}
+
+enum PlayUpNextIntentError: LocalizedError, Equatable {
+    case noEpisode
+    case playbackFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .noEpisode:
+            String(
+                localized: "siri_shortcut_play_up_next_no_episode_error",
+                defaultValue: "There’s no next episode in Up Next.",
                 table: "AppIntents"
             )
         case .playbackFailed:
@@ -181,6 +230,44 @@ struct PausePlaybackIntent: AudioPlaybackIntent {
     @MainActor
     func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async {
         await actionPerformer.perform(.pausePlayback)
+    }
+}
+
+struct PlayUpNextIntent: AudioPlaybackIntent {
+    static var title = LocalizedStringResource(
+        "siri_shortcut_play_up_next_intent_title",
+        defaultValue: "Play Next Episode",
+        table: "Localizable"
+    )
+    static var description = IntentDescription(
+        LocalizedStringResource(
+            "siri_shortcut_play_up_next_description",
+            defaultValue: "Plays the first episode in the Pocket Casts Up Next queue.",
+            table: "AppIntents"
+        )
+    )
+    static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
+    static var openAppWhenRun: Bool { false }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { [.background] }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        try await perform(using: SiriShortcutsManager.shared)
+        return .result()
+    }
+
+    @MainActor
+    func perform(using actionPerformer: any FixedSiriShortcutActionPerforming) async throws {
+        switch await actionPerformer.perform(.playUpNext) {
+        case .success:
+            return
+        case .unavailable:
+            throw PlayUpNextIntentError.noEpisode
+        case .playbackFailed:
+            throw PlayUpNextIntentError.playbackFailed
+        }
     }
 }
 

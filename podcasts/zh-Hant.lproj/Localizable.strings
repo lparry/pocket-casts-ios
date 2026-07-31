@@ -3623,6 +3623,8 @@ Pocket Casts Plus</string>
     <string>播放推薦的劇集</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>接下來播放</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>播放下一集</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>播放下一集</string>
     <key>siri_shortcut_previous_chapter</key>

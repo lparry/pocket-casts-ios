@@ -847,16 +847,25 @@ class PlaybackManager: ServerPlaybackDelegate {
         queue.add(episode: episode, fireNotification: true, partOfBulkAdd: false, toTop: toTop)
     }
 
-    func removeIfPlayingOrQueued(episode: BaseEpisode?, fireNotification: Bool, saveCurrentEpisode: Bool = true, userInitiated: Bool = false) {
+    func removeIfPlayingOrQueued(
+        episode: BaseEpisode?,
+        fireNotification: Bool,
+        saveCurrentEpisode: Bool = true,
+        userInitiated: Bool = false,
+        autoPlay: Bool? = nil,
+        completion: (() -> Void)? = nil,
+        failure: (() -> Void)? = nil
+    ) {
         if userInitiated, let episode {
             AnalyticsEpisodeHelper.shared.episodeRemovedFromUpNext(episode: episode)
         }
         if let episode, isCurrentEpisode(uuid: episode.uuid) {
             autoplayIfNeeded()
             if queue.upNextCount() > 0 {
-                playNextEpisode(autoPlay: isPlaying)
+                playNextEpisode(autoPlay: autoPlay ?? isPlaying, completion: completion, failure: failure)
             } else {
                 endPlayback(saveCurrentEpisode: saveCurrentEpisode)
+                failure?()
             }
 
             return
@@ -864,6 +873,9 @@ class PlaybackManager: ServerPlaybackDelegate {
 
         if let episode {
             queue.remove(episode: episode, fireNotification: fireNotification)
+            completion?()
+        } else {
+            failure?()
         }
     }
 
@@ -871,10 +883,13 @@ class PlaybackManager: ServerPlaybackDelegate {
         queue.bulkDelete(uuids: uuids)
     }
 
-    private func playNextEpisode(autoPlay: Bool) {
+    private func playNextEpisode(autoPlay: Bool, completion: (() -> Void)? = nil, failure: (() -> Void)? = nil) {
         playbackStarts.cancel()
         let queueCount = queue.upNextCount()
-        if queueCount == 0 { return }
+        guard queueCount > 0 else {
+            failure?()
+            return
+        }
 
         var index = 0
         if queueCount > 1, Settings.upNextShuffleEnabled() {
@@ -882,7 +897,10 @@ class PlaybackManager: ServerPlaybackDelegate {
             FileLog.shared.addMessage("Play Next Episode with Shuffle enabled: playing episode \(index) out of \(queueCount)")
         }
 
-        guard let nextEpisode = queue.episodeAt(index: index) else { return }
+        guard let nextEpisode = queue.episodeAt(index: index) else {
+            failure?()
+            return
+        }
 
         FileLog.shared.addMessage("Play Next Episode \(nextEpisode.displayableTitle())")
 
@@ -902,9 +920,10 @@ class PlaybackManager: ServerPlaybackDelegate {
         activeError = nil
 
         if autoPlay {
-            play(userInitiated: false)
+            play(completion: completion, failure: failure, userInitiated: false)
         } else {
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.upNextQueueChanged)
+            completion?()
         }
 
         numberOfEpisodesToSleepAfter -= 1

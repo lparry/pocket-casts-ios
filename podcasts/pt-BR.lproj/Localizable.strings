@@ -3623,6 +3623,8 @@ Aqui está um passe de convidado de %1$@ para o Pocket Casts Plus, meu reproduto
     <string>Reproduzindo um episódio sugerido</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Próximos</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Reproduzir o próximo episódio</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Reproduzindo próximo episódio</string>
     <key>siri_shortcut_previous_chapter</key>

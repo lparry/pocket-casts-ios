@@ -3623,6 +3623,8 @@ Hier ist ein Gastpass für %1$@ für Pocket Casts Plus ‒ meinen liebsten Po
     <string>Vorgeschlagene Folge wird wiedergegeben</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Warteschlange</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Nächste Folge abspielen</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Nächste Folge wird wiedergegeben</string>
     <key>siri_shortcut_previous_chapter</key>

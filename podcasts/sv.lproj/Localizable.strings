@@ -3623,6 +3623,8 @@ Här är ett %1$@ gästpass för Pocket Casts Plus – min favoritpodcastspelare
     <string>Spelar upp ett föreslaget avsnitt</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Nästa</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Spela nästa avsnitt</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Spelar upp nästa avsnitt</string>
     <key>siri_shortcut_previous_chapter</key>

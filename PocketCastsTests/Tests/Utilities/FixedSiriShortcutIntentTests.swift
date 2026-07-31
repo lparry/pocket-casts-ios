@@ -187,6 +187,61 @@ final class FixedSiriShortcutIntentTests: XCTestCase {
         XCTAssertEqual(AnalyticsPlaybackHelper.shared.currentSource, .unknown)
         XCTAssertEqual(playbackPauser.pauseCallCount, 1)
     }
+
+    @MainActor
+    func testPlayUpNextPerformsPlayUpNextAction() async throws {
+        let performer = RecordingFixedSiriShortcutActionPerformer()
+
+        try await PlayUpNextIntent().perform(using: performer)
+
+        XCTAssertEqual(performer.performedActions, [.playUpNext])
+    }
+
+    @MainActor
+    func testPlayUpNextFailsWhenThereIsNoNextEpisode() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(result: .unavailable)
+
+        do {
+            try await PlayUpNextIntent().perform(using: performer)
+            XCTFail("Expected Play Up Next to fail")
+        } catch {
+            XCTAssertEqual(error as? PlayUpNextIntentError, .noEpisode)
+        }
+        XCTAssertEqual(performer.performedActions, [.playUpNext])
+    }
+
+    @MainActor
+    func testPlayUpNextReportsPlaybackFailureSeparatelyFromMissingContent() async {
+        let performer = RecordingFixedSiriShortcutActionPerformer(result: .playbackFailed)
+
+        do {
+            try await PlayUpNextIntent().perform(using: performer)
+            XCTFail("Expected Play Up Next to report playback failure")
+        } catch {
+            XCTAssertEqual(error as? PlayUpNextIntentError, .playbackFailed)
+        }
+        XCTAssertEqual(performer.performedActions, [.playUpNext])
+    }
+
+    @MainActor
+    func testPlayUpNextWaitsForNextEpisodeToStart() async {
+        let upNextPlayer = RecordingFixedSiriShortcutUpNextPlayer(playbackStarted: true)
+
+        let started = await SiriShortcutsManager.shared.playUpNext(using: upNextPlayer)
+
+        XCTAssertEqual(started, .success)
+        XCTAssertEqual(upNextPlayer.startNextEpisodeCallCount, 1)
+    }
+
+    @MainActor
+    func testPlayUpNextReportsPlaybackStartupFailure() async {
+        let upNextPlayer = RecordingFixedSiriShortcutUpNextPlayer(playbackStarted: false)
+
+        let started = await SiriShortcutsManager.shared.playUpNext(using: upNextPlayer)
+
+        XCTAssertEqual(started, .playbackFailed)
+        XCTAssertEqual(upNextPlayer.startNextEpisodeCallCount, 1)
+    }
 }
 
 @MainActor
@@ -232,6 +287,21 @@ private final class RecordingFixedSiriShortcutPlaybackPauser: FixedSiriShortcutP
 
     func pause(userInitiated: Bool) {
         pauseCallCount += 1
+    }
+}
+
+@MainActor
+private final class RecordingFixedSiriShortcutUpNextPlayer: FixedSiriShortcutUpNextPlaying {
+    private let playbackStarted: Bool
+    private(set) var startNextEpisodeCallCount = 0
+
+    init(playbackStarted: Bool) {
+        self.playbackStarted = playbackStarted
+    }
+
+    func startNextEpisode() async -> FixedSiriShortcutActionResult {
+        startNextEpisodeCallCount += 1
+        return playbackStarted ? .success : .playbackFailed
     }
 }
 

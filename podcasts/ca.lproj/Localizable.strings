@@ -3616,6 +3616,8 @@ Aquí tens una invitació de  %1$@ per a Pocket Casts Plus, el meu reproductor d
     <string>Reproduint un capítol recomanat</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Tot seguit</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Reprodueix l’episodi següent</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Reproduint el capítol següent</string>
     <key>siri_shortcut_previous_chapter</key>

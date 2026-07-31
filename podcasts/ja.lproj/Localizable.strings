@@ -3623,6 +3623,8 @@ Pocket Casts を最大限に活用しましょう。</string>
     <string>提案されたエピソードを再生</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>次のエピソード</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>次のエピソードを再生</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>次のエピソードを再生</string>
     <key>siri_shortcut_previous_chapter</key>

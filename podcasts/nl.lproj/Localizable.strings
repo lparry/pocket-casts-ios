@@ -3617,6 +3617,8 @@ Hier is een gastenpas van %1$@ voor Pocket Casts Plus, mijn favoriete podcastspe
     <string>Een voorgestelde aflevering afspelen</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Hierna</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Speel de volgende aflevering af</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Volgende aflevering afspelen</string>
     <key>siri_shortcut_previous_chapter</key>

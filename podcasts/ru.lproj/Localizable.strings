@@ -3623,6 +3623,8 @@ Pocket Casts на полную мощность.</string>
     <string>Воспроизведение рекомендуемого выпуска</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Следующие</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Воспроизвести следующий выпуск</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Воспроизведение следующего выпуска</string>
     <key>siri_shortcut_previous_chapter</key>

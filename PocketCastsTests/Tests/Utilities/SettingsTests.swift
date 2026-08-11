@@ -39,4 +39,29 @@ final class SettingsTests: XCTestCase {
 
         XCTAssertEqual(defaultPlayerActions, Settings.playerActions(), "Player actions should include changes from update")
     }
+
+    func testAutoRestartSleepTimerWindowDefaultsToFiveMinutes() {
+        UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.autoRestartSleepTimerWindow)
+        defer { UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.autoRestartSleepTimerWindow) }
+
+        XCTAssertEqual(Settings.autoRestartSleepTimerWindow, 5.minutes)
+    }
+
+    func testAutoRestartSleepTimerWindowPersistsSelectedValue() {
+        defer { UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.autoRestartSleepTimerWindow) }
+
+        Settings.autoRestartSleepTimerWindow = 2.hours
+
+        XCTAssertEqual(Settings.autoRestartSleepTimerWindow, 2.hours)
+    }
+
+    func testAutoRestartSleepTimerWindowClampsToSupportedRange() {
+        defer { UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.autoRestartSleepTimerWindow) }
+
+        Settings.autoRestartSleepTimerWindow = 1.minute
+        XCTAssertEqual(Settings.autoRestartSleepTimerWindow, 5.minutes)
+
+        Settings.autoRestartSleepTimerWindow = 3.hours
+        XCTAssertEqual(Settings.autoRestartSleepTimerWindow, 2.hours)
+    }
 }

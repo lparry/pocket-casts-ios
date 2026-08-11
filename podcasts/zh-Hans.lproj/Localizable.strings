@@ -300,7 +300,9 @@
     <key>auto_restart_sleep_timer</key>
     <string>自动重启睡眠计时器</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>如果打开，则如果您在最后一次暂停后的 5 分钟内播放了剧集，睡眠计时器将自动重启。</string>
+    <string>如果打开，则如果您在最后一次暂停后的所选时间内播放了剧集，睡眠计时器将自动重启。</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>重启时限</string>
     <key>back</key>
     <string>返回</string>
     <key>banner_ads_info_label</key>

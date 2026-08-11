@@ -300,7 +300,9 @@
     <key>auto_restart_sleep_timer</key>
     <string>Автоматический перезапуск таймера сна</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>В режиме «Включено» таймер сна будет автоматически перезапущен, если вы воспроизведёте выпуск в течение 5 минут после последней остановки.</string>
+    <string>В режиме «Включено» таймер сна будет автоматически перезапущен, если вы воспроизведёте выпуск в течение выбранного периода после последней остановки.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Перезапустить в течение</string>
     <key>back</key>
     <string>Назад</string>
     <key>banner_ads_info_label</key>

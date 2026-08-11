@@ -300,7 +300,9 @@ Descarrega l'app per a una experiència completa!</string>
     <key>auto_restart_sleep_timer</key>
     <string>Reinicia automàticament el temporitzador de son</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Si està activat, el temporitzador de son es reiniciarà automàticament si reprodueixes un episodi als  5 minuts següents a l'última pausa.</string>
+    <string>Si està activat, el temporitzador de son es reiniciarà automàticament si reprodueixes un episodi dins del temps seleccionat després de l'última pausa.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Reinicia en un termini de</string>
     <key>back</key>
     <string>Enrere</string>
     <key>banner_ads_info_label</key>

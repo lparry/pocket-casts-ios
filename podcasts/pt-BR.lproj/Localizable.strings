@@ -300,7 +300,9 @@ Faça download do aplicativo para ter uma experiência completa!</string>
     <key>auto_restart_sleep_timer</key>
     <string>Reiniciar temporizador automaticamente</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Quando ativado, o temporizador será reiniciado automaticamente se você reproduzir um episódio dentro de cinco minutos após a última pausa.</string>
+    <string>Quando ativado, o temporizador será reiniciado automaticamente se você reproduzir um episódio dentro do período selecionado após a última pausa.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Reiniciar dentro de</string>
     <key>back</key>
     <string>Voltar</string>
     <key>banner_ads_info_label</key>

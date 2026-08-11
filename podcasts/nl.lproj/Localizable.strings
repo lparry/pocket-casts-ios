@@ -300,7 +300,9 @@ Download de app voor de volledige ervaring!</string>
     <key>auto_restart_sleep_timer</key>
     <string>Automatisch opnieuw opstarten van slaaptimer</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Indien ingeschakeld, wordt de slaaptimer automatisch opnieuw opgestart als je een aflevering afspeelt binnen vijf minuten van de laatste pauzering.</string>
+    <string>Indien ingeschakeld, wordt de slaaptimer automatisch opnieuw opgestart als je een aflevering afspeelt binnen de geselecteerde tijd na de laatste pauzering.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Opnieuw starten binnen</string>
     <key>back</key>
     <string>Terug</string>
     <key>banner_ads_remove_ads</key>

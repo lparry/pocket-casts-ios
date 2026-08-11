@@ -300,7 +300,9 @@ Lade die App herunter, um das bestmögliche Erlebnis zu erhalten!</string>
     <key>auto_restart_sleep_timer</key>
     <string>Schlummerfunktion automatisch neu starten</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Wenn die Schlummerfunktion aktiviert ist, wird sie automatisch neu gestartet, wenn du innerhalb von fünf Minuten nach der letzten Pause eine Folge abspielst.</string>
+    <string>Wenn die Schlummerfunktion aktiviert ist, wird sie automatisch neu gestartet, wenn du innerhalb des ausgewählten Zeitraums nach der letzten Pause eine Folge abspielst.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Neustart innerhalb von</string>
     <key>back</key>
     <string>Zurück</string>
     <key>banner_ads_info_label</key>

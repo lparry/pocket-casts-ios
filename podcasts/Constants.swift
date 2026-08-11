@@ -173,6 +173,7 @@ struct Constants {
         static let autoplay = "autoplay"
 
         static let autoRestartSleepTimer = "autoRestartSleepTimer"
+        static let autoRestartSleepTimerWindow = "autoRestartSleepTimerWindow"
         static let shakeToRestartSleepTimer = "shakeToRestartSleepTimer"
 
         static let searchHistoryEntries = "SearchHistoryEntries"
@@ -295,6 +296,7 @@ struct Constants {
 
         static let minSleepTime = 5.minutes
         static let maxSleepTime = 5.hours
+        static let autoRestartSleepTimerWindow = 5.minutes ... 2.hours
 
         #if os(watchOS)
             static let watchListItems = 50

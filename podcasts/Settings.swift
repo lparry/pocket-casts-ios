@@ -76,6 +76,9 @@ class Settings: NSObject {
     // MARK: - Up Next Auto Download
 
     private static let autoDownloadUpNext = "SJAutoDownloadUpNext"
+    static let autoDownloadUpNextLimitKey = "SJAutoDownloadUpNextLimit"
+    static let autoDownloadUpNextRetentionLimitKey = "SJAutoDownloadUpNextRetentionLimit"
+
     class func downloadUpNextEpisodes() -> Bool {
         UserDefaults.standard.bool(forKey: Settings.autoDownloadUpNext)
     }
@@ -83,6 +86,31 @@ class Settings: NSObject {
     class func setDownloadUpNextEpisodes(_ download: Bool) {
         UserDefaults.standard.set(download, forKey: Settings.autoDownloadUpNext)
         trackValueToggled(.settingsAutoDownloadUpNextToggled, enabled: download)
+    }
+
+    class func upNextAutoDownloadLimit() -> UpNextAutoDownloadLimit {
+        UpNextAutoDownloadLimit(rawValue: UserDefaults.standard.integer(forKey: autoDownloadUpNextLimitKey)) ?? .entireQueue
+    }
+
+    class func setUpNextAutoDownloadLimit(_ limit: UpNextAutoDownloadLimit) {
+        UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextLimitKey)
+
+        if let episodeCount = limit.episodeCount,
+           let retentionCount = upNextAutoDownloadRetentionLimit().episodeCount,
+           retentionCount < episodeCount {
+            UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextRetentionLimitKey)
+        }
+
+        trackValueChanged(.settingsAutoDownloadUpNextLimitChanged, value: limit.analyticsValue)
+    }
+
+    class func upNextAutoDownloadRetentionLimit() -> UpNextAutoDownloadLimit {
+        UpNextAutoDownloadLimit(rawValue: UserDefaults.standard.integer(forKey: autoDownloadUpNextRetentionLimitKey)) ?? .entireQueue
+    }
+
+    class func setUpNextAutoDownloadRetentionLimit(_ limit: UpNextAutoDownloadLimit) {
+        UserDefaults.standard.set(limit.rawValue, forKey: autoDownloadUpNextRetentionLimitKey)
+        trackValueChanged(.settingsAutoDownloadUpNextRetentionLimitChanged, value: limit.analyticsValue)
     }
 
     // MARK: - Mobile Data

@@ -2509,8 +2509,26 @@
 /* Subtitle explaining the toggle to auto download New Episodes. */
 "settings_auto_downloads_subtitle_new_episodes" = "Automatically download new episodes, save episodes from newly followed shows, and manage your storage by setting a limit on how many episodes are saved.";
 
-/* Subtitle explaining the toggle to auto download items in the Up Next Queue. */
-"settings_auto_downloads_subtitle_up_next" = "Download episodes added to Up Next.";
+/* Subtitle explaining how the Up Next auto-download and retention limits behave. */
+"settings_auto_downloads_subtitle_up_next" = "Download episodes at the front of Up Next. Keep downloaded can remove automatically downloaded or cached episodes further back while preserving manual downloads and starred episodes.";
+
+/* Label for choosing how many episodes at the front of Up Next should be automatically downloaded. */
+"settings_auto_downloads_up_next_limit" = "Download ahead";
+
+/* Option to automatically download every episode in Up Next. */
+"settings_auto_downloads_up_next_entire_queue" = "Entire queue";
+
+/* Option to automatically download a limited number of episodes at the front of Up Next. '%1$@' is the episode count. */
+"settings_auto_downloads_up_next_first_episodes_format" = "First %1$@ episodes";
+
+/* Label for choosing the maximum number of auto-downloaded Up Next episodes to retain. */
+"settings_auto_downloads_up_next_retention_limit" = "Keep downloaded";
+
+/* Option to retain all auto-downloaded Up Next episodes. */
+"settings_auto_downloads_up_next_retention_no_limit" = "No limit";
+
+/* Option to retain at most a specified number of auto-downloaded Up Next episodes. '%1$@' is the episode count. */
+"settings_auto_downloads_up_next_retention_episodes_format" = "At most %1$@ episodes";
 
 /* Section Header for selecting the options for setting the app badge based on the user's filters. */
 "settings_badge_filter_header" = "EPISODE FILTER COUNT";
@@ -5138,6 +5156,21 @@
 /* Up Next sort option that orders episodes by time remaining, longest first */
 "up_next_sort_longest_to_shortest" = "Longest to shortest";
 
+/* Alert title shown before sorting Up Next when the sort may change automatically managed downloads */
+"up_next_sort_confirmation_title" = "Sort Up Next?";
+
+/* Alert message shown before sorting Up Next when the sort may add or remove automatically managed downloads */
+"up_next_sort_confirmation_message" = "This may download episodes moved toward the front and remove downloads moved further down your queue.";
+
+/* Button title that confirms sorting Up Next when automatically managed downloads may change */
+"up_next_sort_confirmation_action" = "Sort";
+
+/* Toast message shown after Up Next has been sorted */
+"up_next_sort_applied" = "Up Next sorted";
+
+/* Button title that restores the Up Next order from before the latest sort */
+"up_next_sort_undo" = "Undo";
+
 /* Title of the tooltip shown on the Up Next tab that alerts users to the new sort by duration option */
 "up_next_sort_duration_tooltip_title" = "Sort by duration";
 
@@ -6576,4 +6609,3 @@
 
 /* tv create account login step - log in to your account */
 "tv_create_account_step_login" = "Log in to your account";
-

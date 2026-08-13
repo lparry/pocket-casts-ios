@@ -77,6 +77,22 @@ enum PodcastFinishedAction: Int {
     case doNothing = 0, delete
 }
 
+enum UpNextAutoDownloadLimit: Int, CaseIterable {
+    case entireQueue = 0
+    case five = 5
+    case ten = 10
+    case twenty = 20
+    case fifty = 50
+
+    var episodeCount: Int? {
+        self == .entireQueue ? nil : rawValue
+    }
+
+    var analyticsValue: Any {
+        self == .entireQueue ? "entire_queue" : rawValue
+    }
+}
+
 enum PodcastThumbnailSize {
     case list, grid, page, detail
 }

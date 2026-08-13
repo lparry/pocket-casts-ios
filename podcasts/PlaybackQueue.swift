@@ -9,6 +9,7 @@ class PlaybackQueue: NSObject {
 
     private let syncTimerDelay: TimeInterval = 5
     private let interactionGracePeriod: TimeInterval = 10
+    private let autoDownloadQueue = DispatchQueue(label: "au.com.pocketcasts.upNextAutoDownload")
     private var syncTimer: Timer?
     private var lastUserInteractionTime: Date?
 
@@ -185,7 +186,7 @@ class PlaybackQueue: NSObject {
     }
 
     /// Reorders the Up Next queue to match `sortedEpisodes` (the queued episodes excluding now playing, which stays pinned at the top).
-    func reorderUpNext(sortedEpisodes: [BaseEpisode]) {
+    func reorderUpNext(sortedEpisodes: [BaseEpisode], checkForAutoDownload: Bool = true) {
         guard sortedEpisodes.count > 1 else { return }
 
         // Up Next playlist entries, excluding the now playing episode at index 0.
@@ -209,7 +210,38 @@ class PlaybackQueue: NSObject {
 
         saveReplaceIfRequired()
 
-        refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged)
+        refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged, checkForAutoDownload: checkForAutoDownload)
+    }
+
+    /// Captures the order of the queued episodes, excluding now playing so it can remain pinned if playback advances.
+    func upNextOrderSnapshot() -> [String] {
+        Array(DataManager.sharedManager.allUpNextPlaylistEpisodes().dropFirst()).map(\.episodeUuid)
+    }
+
+    /// Restores the relative order of episodes that are still in Up Next.
+    /// Episodes added since the snapshot are retained at the bottom.
+    func restoreUpNextOrder(_ episodeUuids: [String], checkForAutoDownload: Bool = true) {
+        let allPlaylistEpisodes = DataManager.sharedManager.allUpNextPlaylistEpisodes()
+        guard allPlaylistEpisodes.count > 1 else { return }
+
+        var remaining = Array(allPlaylistEpisodes.dropFirst())
+        var ordered = [PlaylistEpisode]()
+
+        for episodeUuid in episodeUuids {
+            if let index = remaining.firstIndex(where: { $0.episodeUuid == episodeUuid }) {
+                ordered.append(remaining.remove(at: index))
+            }
+        }
+        ordered.append(contentsOf: remaining)
+
+        for (index, playlistEpisode) in ordered.enumerated() {
+            playlistEpisode.episodePosition = Int32(index + 1)
+        }
+        DataManager.sharedManager.save(playlistEpisodes: ordered)
+
+        saveReplaceIfRequired()
+
+        refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged, checkForAutoDownload: checkForAutoDownload)
     }
 
     func insert(episode: BaseEpisode, position: Int) {
@@ -390,13 +422,68 @@ class PlaybackQueue: NSObject {
     private func checkAllForAutoDownload() {
         if !Settings.downloadUpNextEpisodes() { return }
 
-        DispatchQueue.global().async { [weak self] in
+        autoDownloadQueue.async { [weak self] in
             guard let self else { return }
-            let episodes = self.allEpisodes(includeNowPlaying: true)
-            for episode in episodes {
+
+            guard Settings.downloadUpNextEpisodes() else { return }
+
+            let queue = DataManager.sharedManager.allUpNextPlaylistEpisodes()
+            let downloadLimit = Settings.upNextAutoDownloadLimit()
+            let episodeUUIDs = Self.episodeUUIDsToAutoDownload(from: queue, limit: downloadLimit)
+            for episodeUUID in episodeUUIDs {
+                guard let episode = DataManager.sharedManager.findBaseEpisode(uuid: episodeUUID) else { continue }
                 self.autoDownloadIfRequired(episode: episode)
             }
+
+            let resolvedEpisodes = queue.compactMap {
+                DataManager.sharedManager.findBaseEpisode(uuid: $0.episodeUuid)
+            }
+            let retentionLimit = downloadLimit == .entireQueue ? .entireQueue : Settings.upNextAutoDownloadRetentionLimit()
+            let episodeUUIDsToOffload = Self.episodeUUIDsToOffload(
+                from: resolvedEpisodes,
+                protectedUUIDs: Set(episodeUUIDs),
+                currentEpisodeUUID: queue.first?.episodeUuid,
+                retentionLimit: retentionLimit
+            )
+            for episodeUUID in episodeUUIDsToOffload {
+                self.offloadAutomaticallyStoredEpisode(uuid: episodeUUID)
+            }
         }
+    }
+
+    static func episodeUUIDsToAutoDownload(from queue: [PlaylistEpisode], limit: UpNextAutoDownloadLimit) -> [String] {
+        let episodes = limit.episodeCount.map { queue.prefix($0) } ?? queue[...]
+        return episodes.map(\.episodeUuid)
+    }
+
+    static func episodeUUIDsToOffload(from episodes: [BaseEpisode], protectedUUIDs: Set<String>, currentEpisodeUUID: String?, retentionLimit: UpNextAutoDownloadLimit) -> [String] {
+        guard let retentionCount = retentionLimit.episodeCount else { return [] }
+
+        let automaticallyStoredEpisodes = episodes.filter {
+            let isCompletedStreamingBuffer = $0.episodeStatus == DownloadStatus.downloadedForStreaming.rawValue
+            let isPromotedStreamingBuffer = $0.episodeStatus == DownloadStatus.downloaded.rawValue &&
+                $0.autoDownloadStatus == AutoDownloadStatus.playerDownloadedForStreaming.rawValue
+            let isAutomaticDownload = $0.autoDownloadStatus == AutoDownloadStatus.autoDownloaded.rawValue &&
+                ($0.episodeStatus == DownloadStatus.downloaded.rawValue ||
+                    $0.episodeStatus == DownloadStatus.queued.rawValue ||
+                    $0.episodeStatus == DownloadStatus.downloading.rawValue ||
+                    $0.episodeStatus == DownloadStatus.waitingForWifi.rawValue)
+
+            return isCompletedStreamingBuffer || isPromotedStreamingBuffer || isAutomaticDownload
+        }
+        let excessCount = max(0, automaticallyStoredEpisodes.count - retentionCount)
+        guard excessCount > 0 else { return [] }
+
+        let candidates = automaticallyStoredEpisodes.reversed().compactMap { episode -> String? in
+            guard episode.uuid != currentEpisodeUUID,
+                  !protectedUUIDs.contains(episode.uuid),
+                  !episode.keepEpisode else {
+                return nil
+            }
+
+            return episode.uuid
+        }
+        return Array(candidates.prefix(excessCount))
     }
 
     private func autoDownloadIfRequired(episode: BaseEpisode) {
@@ -408,14 +495,39 @@ class PlaybackQueue: NSObject {
             DownloadManager.shared.queueForLaterDownload(episodeUuid: episode.uuid, fireNotification: true, autoDownloadStatus: .autoDownloaded)
         }
     }
+
+    private func offloadAutomaticallyStoredEpisode(uuid: String) {
+        guard let episode = DataManager.sharedManager.findBaseEpisode(uuid: uuid), !episode.keepEpisode else {
+            return
+        }
+
+        let isCompletedDownload = episode.episodeStatus == DownloadStatus.downloaded.rawValue &&
+            episode.autoDownloadStatus == AutoDownloadStatus.autoDownloaded.rawValue
+        let isCompletedStreamingBuffer = episode.episodeStatus == DownloadStatus.downloadedForStreaming.rawValue
+        let isPromotedStreamingBuffer = episode.episodeStatus == DownloadStatus.downloaded.rawValue &&
+            episode.autoDownloadStatus == AutoDownloadStatus.playerDownloadedForStreaming.rawValue
+        let isActiveAutomaticDownload = episode.autoDownloadStatus == AutoDownloadStatus.autoDownloaded.rawValue &&
+            (episode.queued() || episode.downloading() || episode.waitingForWifi())
+        guard isCompletedDownload || isCompletedStreamingBuffer || isPromotedStreamingBuffer || isActiveAutomaticDownload else {
+            return
+        }
+
+        FileLog.shared.addMessage("PlaybackQueue: offloading automatically stored episode \(episode.displayableTitle())")
+        if isCompletedDownload || isCompletedStreamingBuffer || isPromotedStreamingBuffer {
+            EpisodeManager.deleteDownloadedFiles(episode: episode)
+            NotificationCenter.postOnMainThread(notification: Constants.Notifications.episodeDownloadStatusChanged, object: episode.uuid)
+        } else if isActiveAutomaticDownload {
+            DownloadManager.shared.removeFromQueue(episode: episode, fireNotification: true, userInitiated: true)
+        }
+    }
     #endif
 
     private func cacheTopEpisode() {
         topEpisode = episodeAt(index: -1)
     }
 
-    private func refreshAppFiring(notificationName: Notification.Name?, notificationObject: Any? = nil, notificationUserInfo: [AnyHashable: Any]? = nil) {
-        refreshList(checkForAutoDownload: true)
+    private func refreshAppFiring(notificationName: Notification.Name?, notificationObject: Any? = nil, notificationUserInfo: [AnyHashable: Any]? = nil, checkForAutoDownload: Bool = true) {
+        refreshList(checkForAutoDownload: checkForAutoDownload)
 
         if let name = notificationName {
             NotificationCenter.postOnMainThread(notification: name, object: notificationObject, userInfo: notificationUserInfo)

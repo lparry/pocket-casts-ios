@@ -74,6 +74,199 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertTrue(mockDataManager.savedPlaylistEpisodes.isEmpty, "Reordering one episode should be a no-op")
     }
 
+    func testUpNextOrderSnapshotExcludesNowPlaying() {
+        let playbackQueue = PlaybackQueue()
+        let mockDataManager = MockDataManager()
+        DataManager.sharedManager = mockDataManager
+
+        mockDataManager.upNextEpisodes = [
+            playlistEpisode(uuid: "now-playing", position: 0),
+            playlistEpisode(uuid: "a", position: 1),
+            playlistEpisode(uuid: "b", position: 2)
+        ]
+
+        XCTAssertEqual(playbackQueue.upNextOrderSnapshot(), ["a", "b"])
+    }
+
+    func testRestoreUpNextOrderKeepsCurrentEpisodePinnedAndRetainsNewEpisodes() {
+        let playbackQueue = PlaybackQueue()
+        let mockDataManager = MockDataManager()
+        DataManager.sharedManager = mockDataManager
+
+        mockDataManager.upNextEpisodes = [
+            playlistEpisode(uuid: "new-now-playing", position: 0),
+            playlistEpisode(uuid: "b", position: 1),
+            playlistEpisode(uuid: "new", position: 2),
+            playlistEpisode(uuid: "a", position: 3)
+        ]
+
+        playbackQueue.restoreUpNextOrder(["a", "old-now-playing", "b"], checkForAutoDownload: false)
+
+        let savedUuids = mockDataManager.savedPlaylistEpisodes.map(\.episodeUuid)
+        let savedPositions = mockDataManager.savedPlaylistEpisodes.map(\.episodePosition)
+
+        XCTAssertEqual(savedUuids, ["a", "b", "new"])
+        XCTAssertEqual(savedPositions, [1, 2, 3])
+    }
+
+    func testAutoDownloadEntireQueueReturnsEveryEpisodeInOrder() {
+        let queue = [
+            playlistEpisode(uuid: "now-playing", position: 0),
+            playlistEpisode(uuid: "a", position: 1),
+            playlistEpisode(uuid: "b", position: 2)
+        ]
+
+        let result = PlaybackQueue.episodeUUIDsToAutoDownload(from: queue, limit: .entireQueue)
+
+        XCTAssertEqual(result, ["now-playing", "a", "b"])
+    }
+
+    func testAutoDownloadLimitIncludesNowPlayingAndUsesQueuePositions() {
+        let queue = (0 ..< 12).map {
+            playlistEpisode(uuid: "episode-\($0)", position: Int32($0))
+        }
+
+        let result = PlaybackQueue.episodeUUIDsToAutoDownload(from: queue, limit: .ten)
+
+        XCTAssertEqual(result, (0 ..< 10).map { "episode-\($0)" })
+    }
+
+    func testAutoDownloadLimitDoesNotBackfillPastUnresolvedQueueEntries() {
+        let queue = (0 ..< 12).map {
+            playlistEpisode(uuid: $0 == 4 ? "unresolved" : "episode-\($0)", position: Int32($0))
+        }
+
+        let result = PlaybackQueue.episodeUUIDsToAutoDownload(from: queue, limit: .ten)
+
+        XCTAssertEqual(result.count, 10)
+        XCTAssertTrue(result.contains("unresolved"))
+        XCTAssertFalse(result.contains("episode-10"))
+    }
+
+    func testRetentionLimitOffloadsFurthestAutoDownloadsOutsideProtectedWindow() {
+        let episodes = (0 ..< 15).map {
+            downloadedEpisode("episode-\($0)")
+        }
+        let protectedUUIDs = Set((0 ..< 10).map { "episode-\($0)" })
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: episodes,
+            protectedUUIDs: protectedUUIDs,
+            currentEpisodeUUID: "episode-0",
+            retentionLimit: .ten
+        )
+
+        XCTAssertEqual(result, ["episode-14", "episode-13", "episode-12", "episode-11", "episode-10"])
+    }
+
+    func testRetentionLimitDoesNotCountManualDownloads() {
+        let autoDownloaded = (0 ..< 5).map {
+            downloadedEpisode("auto-\($0)")
+        }
+        let manuallyDownloaded = (0 ..< 5).map {
+            downloadedEpisode("manual-\($0)", autoDownloaded: false)
+        }
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: autoDownloaded + manuallyDownloaded,
+            protectedUUIDs: [],
+            currentEpisodeUUID: nil,
+            retentionLimit: .five
+        )
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testRetentionLimitPreservesStarredEpisodes() {
+        let episodes = (0 ..< 12).map {
+            downloadedEpisode("episode-\($0)", keepEpisode: $0 == 11)
+        }
+        let protectedUUIDs = Set((0 ..< 10).map { "episode-\($0)" })
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: episodes,
+            protectedUUIDs: protectedUUIDs,
+            currentEpisodeUUID: "episode-0",
+            retentionLimit: .ten
+        )
+
+        XCTAssertEqual(result, ["episode-10"])
+    }
+
+    func testRetentionLimitDoesNotOffloadWhenThereIsNoLimit() {
+        let episodes = (0 ..< 12).map {
+            downloadedEpisode("episode-\($0)")
+        }
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: episodes,
+            protectedUUIDs: [],
+            currentEpisodeUUID: nil,
+            retentionLimit: .entireQueue
+        )
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testRetentionLimitSelectsActiveAutomaticDownloadsForRemoval() {
+        let protectedEpisodes = (0 ..< 5).map {
+            downloadedEpisode("episode-\($0)")
+        }
+        let queuedEpisode = autoDownloadEpisode("queued", status: .queued)
+        let downloadingEpisode = autoDownloadEpisode("downloading", status: .downloading)
+        let waitingEpisode = autoDownloadEpisode("waiting", status: .waitingForWifi)
+        let manualDownload = autoDownloadEpisode("manual", status: .downloading, autoDownloaded: false)
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: protectedEpisodes + [queuedEpisode, downloadingEpisode, waitingEpisode, manualDownload],
+            protectedUUIDs: Set(protectedEpisodes.map(\.uuid)),
+            currentEpisodeUUID: "episode-0",
+            retentionLimit: .five
+        )
+
+        XCTAssertEqual(result, ["waiting", "downloading", "queued"])
+    }
+
+    func testRetentionLimitCountsCompletedStreamingBuffers() {
+        let protectedEpisodes = (0 ..< 5).map {
+            downloadedEpisode("episode-\($0)")
+        }
+        let streamingBuffer = autoDownloadEpisode(
+            "streaming-buffer",
+            status: .downloadedForStreaming,
+            autoDownloadStatus: .playerDownloadedForStreaming
+        )
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: protectedEpisodes + [streamingBuffer],
+            protectedUUIDs: Set(protectedEpisodes.map(\.uuid)),
+            currentEpisodeUUID: "episode-0",
+            retentionLimit: .five
+        )
+
+        XCTAssertEqual(result, ["streaming-buffer"])
+    }
+
+    func testRetentionLimitCountsStreamingBuffersPromotedToDownloads() {
+        let protectedEpisodes = (0 ..< 5).map {
+            downloadedEpisode("episode-\($0)")
+        }
+        let promotedStreamingBuffer = autoDownloadEpisode(
+            "promoted-streaming-buffer",
+            status: .downloaded,
+            autoDownloadStatus: .playerDownloadedForStreaming
+        )
+
+        let result = PlaybackQueue.episodeUUIDsToOffload(
+            from: protectedEpisodes + [promotedStreamingBuffer],
+            protectedUUIDs: Set(protectedEpisodes.map(\.uuid)),
+            currentEpisodeUUID: "episode-0",
+            retentionLimit: .five
+        )
+
+        XCTAssertEqual(result, ["promoted-streaming-buffer"])
+    }
+
     private func playlistEpisode(uuid: String, position: Int32) -> PlaylistEpisode {
         let playlistEpisode = PlaylistEpisode()
         playlistEpisode.episodeUuid = uuid
@@ -84,6 +277,31 @@ final class PlaybackQueueTests: XCTestCase {
     private func episode(_ uuid: String) -> Episode {
         let episode = Episode()
         episode.uuid = uuid
+        return episode
+    }
+
+    private func downloadedEpisode(_ uuid: String, autoDownloaded: Bool = true, keepEpisode: Bool = false) -> Episode {
+        let episode = autoDownloadEpisode(
+            uuid,
+            status: .downloaded,
+            autoDownloadStatus: autoDownloaded ? .autoDownloaded : .notSpecified
+        )
+        episode.keepEpisode = keepEpisode
+        return episode
+    }
+
+    private func autoDownloadEpisode(_ uuid: String, status: DownloadStatus, autoDownloaded: Bool = true) -> Episode {
+        autoDownloadEpisode(
+            uuid,
+            status: status,
+            autoDownloadStatus: autoDownloaded ? .autoDownloaded : .notSpecified
+        )
+    }
+
+    private func autoDownloadEpisode(_ uuid: String, status: DownloadStatus, autoDownloadStatus: AutoDownloadStatus) -> Episode {
+        let episode = episode(uuid)
+        episode.episodeStatus = status.rawValue
+        episode.autoDownloadStatus = autoDownloadStatus.rawValue
         return episode
     }
 

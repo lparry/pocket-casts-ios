@@ -407,6 +407,35 @@ class SiriShortcutsManager: CustomObserver {
         return INPlayMediaIntentResponseCode.success
     }
 
+    @MainActor
+    func playSuggestedAsync() async -> INPlayMediaIntentResponseCode {
+        AnalyticsHelper.siriSurpriseMe()
+        let recommendationHelper = RecommendationHelper()
+        guard let episodeInfo = recommendationHelper.recommendEpisode() else {
+            return INPlayMediaIntentResponseCode.failureRequiringAppLaunch
+        }
+
+        if let episode = DataManager.sharedManager.findEpisode(uuid: episodeInfo.uuid) {
+            AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+            PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
+            return INPlayMediaIntentResponseCode.success
+        }
+
+        let success = await withCheckedContinuation { continuation in
+            ServerPodcastManager.shared.addFromUuid(podcastUuid: episodeInfo.podcastUuid, subscribe: false) { success in
+                continuation.resume(returning: success)
+            }
+        }
+
+        guard success, let episode = DataManager.sharedManager.findEpisode(uuid: episodeInfo.uuid) else {
+            return INPlayMediaIntentResponseCode.failureNoUnplayedContent
+        }
+
+        AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+        PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
+        return INPlayMediaIntentResponseCode.success
+    }
+
     func skipToNextChapter() -> INPlayMediaIntentResponseCode {
         AnalyticsHelper.siriChapterChanged()
 

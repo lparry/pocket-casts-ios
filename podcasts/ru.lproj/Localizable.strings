@@ -3628,7 +3628,7 @@ Pocket Casts на полную мощность.</string>
     <key>siri_shortcut_previous_chapter</key>
     <string>Предыдущая глава</string>
     <key>siri_shortcut_resume_phrase</key>
-    <string>Резюме</string>
+    <string>Возобновить</string>
     <key>siri_shortcut_resume_title</key>
     <string>Возобновить текущий выпуск</string>
     <key>siri_shortcut_to_podcast</key>

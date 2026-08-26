@@ -15,5 +15,97 @@ struct PocketCastsAppShortcutsProvider: AppShortcutsProvider {
             ),
             systemImageName: "moon.zzz.fill"
         )
+        AppShortcut(
+            intent: ExtendSleepTimerIntent(),
+            phrases: [
+                "\(.applicationName): Extend Sleep Timer",
+                "\(.applicationName): Extend sleep timer by 5 minutes",
+            ],
+            shortTitle: LocalizedStringResource(
+                "ny98Lo",
+                defaultValue: "Extend Sleep Timer",
+                table: "Intents"
+            ),
+            systemImageName: "timer"
+        )
+        AppShortcut(
+            intent: ResumePlaybackIntent(),
+            phrases: [
+                "\(.applicationName): Resume",
+                "Continue playing in \(.applicationName)",
+            ],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_resume_title",
+                defaultValue: "Resume Current Episode",
+                table: "Localizable"
+            ),
+            systemImageName: "play.fill"
+        )
+        AppShortcut(
+            intent: PausePlaybackIntent(),
+            phrases: ["\(.applicationName): Pause"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_pause_title",
+                defaultValue: "Pause Current Episode",
+                table: "Localizable"
+            ),
+            systemImageName: "pause.fill"
+        )
+        AppShortcut(
+            intent: PlayUpNextIntent(),
+            phrases: [
+                "\(.applicationName): Up Next",
+                "Play the next episode in \(.applicationName)",
+            ],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_play_up_next_title",
+                defaultValue: "Playing next episode",
+                table: "Localizable"
+            ),
+            systemImageName: "text.line.first.and.arrowtriangle.forward"
+        )
+        AppShortcut(
+            intent: PlaySuggestedIntent(),
+            phrases: [
+                "Play Suggested in \(.applicationName)",
+                "\(.applicationName): Play a suggested episode",
+            ],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_play_suggested_podcast_title",
+                defaultValue: "Playing a suggested episode",
+                table: "Localizable"
+            ),
+            systemImageName: "sparkles"
+        )
+        AppShortcut(
+            intent: NextChapterIntent(),
+            phrases: ["\(.applicationName): Next chapter"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_next_chapter",
+                defaultValue: "Next chapter",
+                table: "Localizable"
+            ),
+            systemImageName: "forward.end.fill"
+        )
+        AppShortcut(
+            intent: PreviousChapterIntent(),
+            phrases: ["\(.applicationName): Previous chapter"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_previous_chapter",
+                defaultValue: "Previous chapter",
+                table: "Localizable"
+            ),
+            systemImageName: "backward.end.fill"
+        )
+        AppShortcut(
+            intent: MarkAsPlayedIntent(),
+            phrases: ["\(.applicationName): Mark as Played"],
+            shortTitle: LocalizedStringResource(
+                "siri_shortcut_mark_as_played_title",
+                defaultValue: "Mark Current Episode as Played",
+                table: "Localizable"
+            ),
+            systemImageName: "checkmark.circle.fill"
+        )
     }
 }

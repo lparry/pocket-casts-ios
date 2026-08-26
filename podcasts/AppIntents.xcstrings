@@ -105,6 +105,273 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设置睡眠计时器" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "設定睡眠計時器" } }
       }
+    },
+    "Extend Sleep Timer by ${minutes} mins" : {
+      "comment" : "Summary for the App Intent that extends the sleep timer. ${minutes} is the number of minutes to add.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Ampliar el temporitzador ${minutes} minuts" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Schlummerfunktion um ${minutes} Minuten verlängern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extend Sleep Timer by ${minutes} mins" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ampliar temporizador en ${minutes} minutos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Extender temporizador de suspensión ${minutes} minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Retarder la mise en veille de ${minutes} minutes" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Prolonger la minuterie de veille de ${minutes} min" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Ritarda l'autospegnimento di ${minutes} minuti" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スリープタイマーを${minutes}分延長" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Slaaptimer verlengen met ${minutes} minuten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Prolongar o temporizador em ${minutes} minutos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отложить таймер сна на ${minutes} мин." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Förläng Insomningstimer med ${minutes} Minuter" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将睡眠计时器延长 ${minutes} 分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "將睡眠計時器延長 ${minutes} 分鐘" } }
+      }
+    },
+    "siri_shortcut_extend_sleep_timer_minutes_title" : {
+      "comment" : "Title for the number of minutes parameter in the extend sleep timer App Intent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Minuts" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Minuten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Minutes" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Minuti" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "分" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Minuten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Minutos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Минуты" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Minuter" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分鐘" } }
+      }
+    },
+    "siri_shortcut_pause_playback_description" : {
+      "comment" : "Description of the Pause Playback app intent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Posa en pausa la reproducció a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Pausiert die Wiedergabe in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pauses playback in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Pausa la reproducción en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Pausa la reproducción en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Met la lecture en pause dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Met la lecture en pause dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mette in pausa la riproduzione in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで再生を一時停止します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Pauzeert het afspelen in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pausa a reprodução no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Приостанавливает воспроизведение в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Pausar uppspelningen i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂停 Pocket Casts 中的播放。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "暫停 Pocket Casts 中的播放。" } }
+      }
+    },
+    "siri_shortcut_resume_playback_description" : {
+      "comment" : "Description for the App Intent that resumes playback.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Reprèn la reproducció a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Setzt die Wiedergabe in Pocket Casts fort." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resumes playback in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reanuda la reproducción en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Reanuda la reproducción en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Reprend la lecture dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Reprend la lecture dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riprende la riproduzione in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで再生を再開します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Hervat het afspelen in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Retoma a reprodução no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Возобновляет воспроизведение в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Återupptar uppspelningen i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中继续播放。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中繼續播放。" } }
+      }
+    },
+    "siri_shortcut_resume_playback_no_episode_error" : {
+      "comment" : "Error shown when Resume Playback runs without a current episode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap episodi per reprendre." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Es gibt keine Folge zum Fortsetzen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no episode to resume." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio que reanudar." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio que reanudar." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode ne peut être repris." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucun épisode à reprendre." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non ci sono episodi da riprendere." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再開できるエピソードがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is geen aflevering om te hervatten." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há nenhum episódio para retomar." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет выпуска, воспроизведение которого можно возобновить." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget avsnitt att återuppta." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可继续播放的单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有可繼續播放的單集。" } }
+      }
+    },
+    "siri_shortcut_play_up_next_description" : {
+      "comment" : "Description for the App Intent that plays the next episode in Up Next.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Reprodueix el primer episodi de la cua A continuació de Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Spielt die erste Folge in der Pocket Casts-Warteschlange ab." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Plays the first episode in the Pocket Casts Up Next queue." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce el primer episodio de la cola A continuación de Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce el primer episodio de la fila A continuación de Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit le premier épisode de la file À suivre de Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Lit le premier épisode de la file À suivre de Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riproduce il primo episodio nella coda In coda di Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsの「次に再生」キューの最初のエピソードを再生します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Speelt de eerste aflevering in de wachtrij Volgende van Pocket Casts af." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Reproduz o primeiro episódio da fila Próximo do Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Воспроизводит первый выпуск из очереди «Далее» в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Spelar det första avsnittet i Pocket Casts-kön Nästa." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放 Pocket Casts“接下来播放”队列中的第一集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "播放 Pocket Casts「接下來播放」佇列中的第一集。" } }
+      }
+    },
+    "siri_shortcut_play_up_next_no_episode_error" : {
+      "comment" : "Error shown when Play Up Next runs without another episode in the queue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap episodi següent a A continuació." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Unter „Als Nächstes“ gibt es keine weitere Folge." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no next episode in Up Next." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio siguiente en A continuación." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio siguiente en A continuación." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucun épisode suivant dans À suivre." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Il n’y a aucun épisode suivant dans À suivre." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non ci sono episodi successivi in In coda." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "「次に再生」に次のエピソードがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er staat geen volgende aflevering in Volgende." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há um próximo episódio em Próximo." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "В очереди «Далее» нет следующего выпуска." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget nästa avsnitt i Nästa." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "“接下来播放”中没有下一集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "「接下來播放」中沒有下一集。" } }
+      }
+    },
+    "siri_shortcut_play_suggested_description" : {
+      "comment" : "Description for the App Intent that plays a suggested episode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Reprodueix un episodi suggerit a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Spielt eine vorgeschlagene Folge in Pocket Casts ab." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Plays a suggested episode in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce un episodio sugerido en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Reproduce un episodio sugerido en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lit un épisode suggéré dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Lit un épisode suggéré dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riproduce un episodio suggerito in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsでおすすめのエピソードを再生します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Speelt een voorgestelde aflevering af in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Reproduz um episódio sugerido no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Воспроизводит рекомендованный выпуск в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Spelar ett föreslaget avsnitt i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中播放推荐的单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中播放推薦的單集。" } }
+      }
+    },
+    "siri_shortcut_play_suggested_unavailable_error" : {
+      "comment" : "Error shown when no suggested episode can be played.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Ara mateix no hi ha cap episodi suggerit disponible." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zurzeit ist keine vorgeschlagene Folge verfügbar." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A suggested episode isn’t available right now." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio sugerido disponible en este momento." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio sugerido disponible en este momento." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode suggéré n’est disponible pour le moment." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode suggéré n’est disponible pour le moment." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Al momento non è disponibile alcun episodio suggerito." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "現在、おすすめのエピソードを利用できません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is momenteel geen voorgestelde aflevering beschikbaar." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há um episódio sugerido disponível no momento." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сейчас нет доступных рекомендованных выпусков." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget föreslaget avsnitt tillgängligt just nu." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目前没有可播放的推荐单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前沒有可播放的推薦單集。" } }
+      }
+    },
+    "siri_shortcut_next_chapter_description" : {
+      "comment" : "Description for the App Intent that skips to the next chapter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítol següent a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Springt zum nächsten Kapitel in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skips to the next chapter in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo siguiente en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Salta al próximo capítulo en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre suivant dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre suivant dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Passa al capitolo successivo in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで次のチャプターに移動します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Gaat naar het volgende hoofdstuk in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pula para o próximo capítulo no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переходит к следующей главе в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Hoppar till nästa kapitel i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到下一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到下一章。" } }
+      }
+    },
+    "siri_shortcut_previous_chapter_description" : {
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítol anterior a Pocket Casts." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Springt zum vorherigen Kapitel in Pocket Casts." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skips to the previous chapter in Pocket Casts." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo anterior en Pocket Casts." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Salta al capítulo anterior en Pocket Casts." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre précédent dans Pocket Casts." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Passe au chapitre précédent dans Pocket Casts." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Passa al capitolo precedente in Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Pocket Castsで前のチャプターに移動します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Gaat naar het vorige hoofdstuk in Pocket Casts." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pula para o capítulo anterior no Pocket Casts." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Переходит к предыдущей главе в Pocket Casts." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Hoppar till föregående kapitel i Pocket Casts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到上一章。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 Pocket Casts 中跳到上一章。" } }
+      }
+    },
+    "siri_shortcut_mark_as_played_description" : {
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "Marca l’episodi actual de Pocket Casts com a reproduït." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Markiert die aktuelle Pocket Casts-Episode als gespielt." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Marks the current Pocket Casts episode as played." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Marca el episodio actual de Pocket Casts como reproducido." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "Marca el episodio actual de Pocket Casts como reproducido." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Marque l’épisode Pocket Casts actuel comme lu." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Marque l’épisode Pocket Casts actuel comme lu." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Segna come riprodotto l’episodio attuale di Pocket Casts." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "現在のPocket Castsエピソードを再生済みにします。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Markeert de huidige Pocket Casts-aflevering als afgespeeld." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Marca o episódio atual do Pocket Casts como reproduzido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отмечает текущий выпуск Pocket Casts как прослушанный." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Markerar det aktuella Pocket Casts-avsnittet som spelat." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将当前 Pocket Casts 单集标记为已播放。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "將目前的 Pocket Casts 單集標記為已播放。" } }
+      }
+    },
+    "siri_shortcut_mark_as_played_no_episode_error" : {
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "No hi ha cap episodi actual per marcar com a reproduït." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Es gibt keine aktuelle Episode, die als gespielt markiert werden kann." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There’s no current episode to mark as played." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio actual para marcar como reproducido." } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "No hay ningún episodio actual para marcar como reproducido." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode en cours ne peut être marqué comme lu." } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "Aucun épisode en cours ne peut être marqué comme lu." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non c’è un episodio attuale da segnare come riprodotto." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再生済みにする現在のエピソードがありません。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Er is geen huidige aflevering om als afgespeeld te markeren." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não há um episódio atual para marcar como reproduzido." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет текущего выпуска, который можно отметить как прослушанный." } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "Det finns inget aktuellt avsnitt att markera som spelat." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可标记为已播放的当前单集。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有可標記為已播放的目前單集。" } }
+      }
     }
   },
   "version" : "1.0"

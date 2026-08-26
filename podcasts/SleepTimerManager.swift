@@ -3,9 +3,10 @@ import PocketCastsUtils
 import AVKit
 
 class SleepTimerManager {
-    private var restartSleepTimerIfPlayingAgainWithin: TimeInterval = 5.minutes
-
     private let backgroundShakeObserver: BackgroundShakeObserver
+    private let isSleepTimerActive: () -> Bool
+    private let setSleepTimerInterval: (TimeInterval) -> Void
+    private let currentDate: () -> Date
 
     private lazy var tonePlayer: AVAudioPlayer? = {
         guard let url = Bundle.main.url(forResource: "sleep-timer-restarted-sound", withExtension: "mp3") else {
@@ -27,8 +28,16 @@ class SleepTimerManager {
 
     private lazy var fadeOutManager = FadeOutManager()
 
-    init(backgroundShakeObserver: BackgroundShakeObserver = BackgroundShakeObserver()) {
+    init(
+        backgroundShakeObserver: BackgroundShakeObserver = BackgroundShakeObserver(),
+        isSleepTimerActive: @escaping () -> Bool = { PlaybackManager.shared.sleepTimerActive() },
+        setSleepTimerInterval: @escaping (TimeInterval) -> Void = { PlaybackManager.shared.setSleepTimerInterval($0) },
+        currentDate: @escaping () -> Date = { .now }
+    ) {
         self.backgroundShakeObserver = backgroundShakeObserver
+        self.isSleepTimerActive = isSleepTimerActive
+        self.setSleepTimerInterval = setSleepTimerInterval
+        self.currentDate = currentDate
         backgroundShakeObserver.whenShook = { [weak self] in
             self?.restartSleepTimerAndPlayTone()
         }
@@ -53,18 +62,19 @@ class SleepTimerManager {
     }
 
     func restartSleepTimerIfNeeded() {
-        guard !PlaybackManager.shared.sleepTimerActive(), Settings.autoRestartSleepTimer else {
+        guard !isSleepTimerActive(), Settings.autoRestartSleepTimer else {
             return
         }
 
-        let now = Date.now
+        let now = currentDate()
+        let restartWindow = Settings.autoRestartSleepTimerWindow
         if let sleepTimerFinishedDate = Settings.sleepTimerFinishedDate,
-           now.timeIntervalSince(sleepTimerFinishedDate) <= restartSleepTimerIfPlayingAgainWithin,
+           now.timeIntervalSince(sleepTimerFinishedDate) <= restartWindow,
            let setting = Settings.sleepTimerLastSetting {
             if let duration = setting.duration {
-                PlaybackManager.shared.setSleepTimerInterval(duration)
+                setSleepTimerInterval(duration)
                 Analytics.track(.playerSleepTimerRestarted, properties: ["time": duration])
-                FileLog.shared.addMessage("Sleep Timer: restarting it automatically (\(now.description) - \(sleepTimerFinishedDate.description) <= 5 minutes")
+                FileLog.shared.addMessage("Sleep Timer: restarting it automatically (\(now.description) - \(sleepTimerFinishedDate.description) <= \(restartWindow) seconds)")
             } else if setting.sleepOnEpisodeEnd == true {
                 observePlaybackEndAndReactivateTime()
             }
@@ -74,7 +84,7 @@ class SleepTimerManager {
     func restartSleepTimer() {
         if let setting = Settings.sleepTimerLastSetting {
             if let duration = setting.duration {
-                PlaybackManager.shared.setSleepTimerInterval(duration)
+                setSleepTimerInterval(duration)
                 Analytics.track(.playerSleepTimerRestarted, properties: ["time": duration, "reason": "device_shake"])
                 FileLog.shared.addMessage("Sleep Timer: restarting it after device shake")
             }
@@ -99,7 +109,7 @@ class SleepTimerManager {
     }
 
     private func restartSleepTimerAndPlayTone() {
-        guard PlaybackManager.shared.sleepTimerActive() && Settings.shakeToRestartSleepTimer else {
+        guard isSleepTimerActive() && Settings.shakeToRestartSleepTimer else {
             backgroundShakeObserver.stopObserving()
             return
         }

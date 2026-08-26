@@ -300,7 +300,9 @@ Ladda ner appen för att få den fullständiga upplevelsen.</string>
     <key>auto_restart_sleep_timer</key>
     <string>Starta om sömntimern automatiskt</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Om det här alternativet är aktiverat kommer sömntimern att starta om automatiskt om du spelar upp ett avsnitt inom 5 minuter efter den senaste pausen.</string>
+    <string>Om det här alternativet är aktiverat kommer sömntimern att starta om automatiskt om du spelar upp ett avsnitt inom den valda tiden efter den senaste pausen.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Starta om inom</string>
     <key>back</key>
     <string>Tillbaka</string>
     <key>banner_ads_info_label</key>

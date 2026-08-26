@@ -1002,6 +1002,21 @@ class Settings: NSObject {
         }
     }
 
+    static var autoRestartSleepTimerWindow: TimeInterval {
+        get {
+            let savedWindow = UserDefaults.standard.double(forKey: Constants.UserDefaults.autoRestartSleepTimerWindow)
+            guard savedWindow.isFinite else {
+                return Constants.Limits.autoRestartSleepTimerWindow.lowerBound
+            }
+
+            return savedWindow.clamped(to: Constants.Limits.autoRestartSleepTimerWindow)
+        }
+        set {
+            let window = newValue.isFinite ? newValue : Constants.Limits.autoRestartSleepTimerWindow.lowerBound
+            UserDefaults.standard.set(window.clamped(to: Constants.Limits.autoRestartSleepTimerWindow), forKey: Constants.UserDefaults.autoRestartSleepTimerWindow)
+        }
+    }
+
     static var shakeToRestartSleepTimer: Bool {
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.shakeToRestartSleepTimer)

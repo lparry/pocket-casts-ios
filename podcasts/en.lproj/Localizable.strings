@@ -4762,11 +4762,14 @@
 /* Name of the option to restart sleep timer */
 "auto_restart_sleep_timer" = "Auto Restart Sleep Timer";
 
+/* Name of the setting that controls how soon playback must resume for the sleep timer to restart */
+"auto_restart_sleep_timer_window" = "Restart Within";
+
 /* Name of the option to shake to restart sleep timer */
 "shake_to_restart_sleep_timer" = "Shake to restart Sleep Timer";
 
 /* Description of the option to restart sleep timer */
-"auto_restart_sleep_timer_description" = "If on, the sleep timer will restart automatically if you play an episode within 5 minutes after the last pause.";
+"auto_restart_sleep_timer_description" = "Automatically restarts your last sleep timer if playback resumes within the selected time.";
 
 /* Description of the option to shake to restart sleep timer */
 "shake_to_restart_sleep_timer_description" = "If on, the sleep timer will restart when you shake your phone.";

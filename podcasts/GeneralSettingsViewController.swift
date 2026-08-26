@@ -12,9 +12,14 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
 
     let debounce = Debounce(delay: Constants.defaultDebounceTime)
 
-    enum TableRow { case skipForward, skipBack, keepScreenAwake, openPlayer, intelligentPlaybackResumption, defaultRowAction, extraMediaActions, defaultAddToUpNextSwipe, defaultGrouping, defaultArchive, playUpNextOnTap, legacyBluetooth, multiSelectGesture, openLinksInBrowser, publishChapterTitles, generatedChapters, autoplay, autoRestartSleepTimer, shakeToRestartSleepTimer, isLockScreenScrubberDisabled, voiceBoostN, audioOnly }
+    enum TableRow { case skipForward, skipBack, keepScreenAwake, openPlayer, intelligentPlaybackResumption, defaultRowAction, extraMediaActions, defaultAddToUpNextSwipe, defaultGrouping, defaultArchive, playUpNextOnTap, legacyBluetooth, multiSelectGesture, openLinksInBrowser, publishChapterTitles, generatedChapters, autoplay, autoRestartSleepTimer, autoRestartSleepTimerWindow, shakeToRestartSleepTimer, isLockScreenScrubberDisabled, voiceBoostN, audioOnly }
     private var tableData: [[TableRow]] {
-        var data: [[TableRow]] = [[.defaultRowAction, .defaultGrouping, .defaultArchive, .defaultAddToUpNextSwipe, .openLinksInBrowser], [.skipForward, .skipBack, .keepScreenAwake, .openPlayer, .isLockScreenScrubberDisabled, .intelligentPlaybackResumption], [.autoRestartSleepTimer], [.shakeToRestartSleepTimer], [.playUpNextOnTap], [.extraMediaActions], [.legacyBluetooth], [.multiSelectGesture], [.publishChapterTitles], [.autoplay]]
+        var sleepTimerRows: [TableRow] = [.autoRestartSleepTimer]
+        if Settings.autoRestartSleepTimer {
+            sleepTimerRows.append(.autoRestartSleepTimerWindow)
+        }
+
+        var data: [[TableRow]] = [[.defaultRowAction, .defaultGrouping, .defaultArchive, .defaultAddToUpNextSwipe, .openLinksInBrowser], [.skipForward, .skipBack, .keepScreenAwake, .openPlayer, .isLockScreenScrubberDisabled, .intelligentPlaybackResumption], sleepTimerRows, [.shakeToRestartSleepTimer], [.playUpNextOnTap], [.extraMediaActions], [.legacyBluetooth], [.multiSelectGesture], [.publishChapterTitles], [.autoplay]]
         if FeatureFlag.hls.enabled {
             data.insert([.audioOnly], at: 2)
         }
@@ -310,6 +315,32 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
             cell.cellSwitch.addTarget(self, action: #selector(autoRestartSleepTimerToggled(_:)), for: .valueChanged)
 
             return cell
+        case .autoRestartSleepTimerWindow:
+            let cell = tableView.dequeueReusableCell(withIdentifier: timeStepperCellId, for: indexPath) as! TimeStepperCell
+            let label = L10n.autoRestartSleepTimerWindow
+            let window = Settings.autoRestartSleepTimerWindow
+
+            cell.cellLabel.text = label
+            cell.cellSecondaryLabel.text = L10n.timeShorthand(Int(window))
+            cell.timeStepper.currentValue = window
+            cell.timeStepper.tintColor = ThemeColor.primaryInteractive01()
+            cell.timeStepper.bigIncrements = 5.minutes
+            cell.timeStepper.smallIncrements = 5.minutes
+            cell.timeStepper.minimumValue = Constants.Limits.autoRestartSleepTimerWindow.lowerBound
+            cell.timeStepper.maximumValue = Constants.Limits.autoRestartSleepTimerWindow.upperBound
+            cell.configureAccessibilityLabel(text: label, time: Int(window))
+
+            cell.onValueChanged = { [weak self] value in
+                Settings.autoRestartSleepTimerWindow = value
+                cell.cellSecondaryLabel.text = L10n.timeShorthand(Int(value))
+                cell.configureAccessibilityLabel(text: label, time: Int(value))
+
+                self?.debounce.call {
+                    Settings.trackValueChanged(.settingsGeneralAutoSleepTimerRestartWindowChanged, value: value)
+                }
+            }
+
+            return cell
         case .shakeToRestartSleepTimer:
             let cell = tableView.dequeueReusableCell(withIdentifier: switchCellId, for: indexPath) as! SwitchCell
 
@@ -483,7 +514,7 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
             return L10n.settingsGeneralAutoplaySubtitle
         case .audioOnly:
             return L10n.settingsGeneralAudioOnlySubtitle
-        case .autoRestartSleepTimer:
+        case .autoRestartSleepTimer, .autoRestartSleepTimerWindow:
             return L10n.autoRestartSleepTimerDescription
         case .shakeToRestartSleepTimer:
             return L10n.shakeToRestartSleepTimerDescription
@@ -607,6 +638,9 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
 
     @objc private func autoRestartSleepTimerToggled(_ sender: UISwitch) {
         Settings.autoRestartSleepTimer = sender.isOn
+        if let section = tableData.firstIndex(where: { $0.contains(.autoRestartSleepTimer) }) {
+            settingsTable.reloadSections(IndexSet(integer: section), with: .automatic)
+        }
 
         Settings.trackValueToggled(.settingsGeneralAutoSleepTimerRestartToggled, enabled: sender.isOn)
     }

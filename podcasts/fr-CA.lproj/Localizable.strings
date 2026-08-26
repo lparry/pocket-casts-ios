@@ -300,7 +300,9 @@ Téléchargez l’application pour vivre pleinement l’expérience !</string>
     <key>auto_restart_sleep_timer</key>
     <string>Redémarrer automatiquement la mise en veille</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Si cette fonction est activée, la mise en veille redémarrera automatiquement si vous écoutez un épisode dans les 5 minutes suivant la dernière pause.</string>
+    <string>Si cette fonction est activée, la mise en veille redémarrera automatiquement si vous écoutez un épisode dans le délai sélectionné suivant la dernière pause.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Redémarrer dans un délai de</string>
     <key>back</key>
     <string>Revenir</string>
     <key>banner_ads_info_label</key>

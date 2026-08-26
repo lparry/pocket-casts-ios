@@ -300,7 +300,9 @@
     <key>auto_restart_sleep_timer</key>
     <string>スリープタイマーを自動再開</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>オンにすると、最後の一時停止から5分以内にエピソードを再生した際にスリープタイマーが自動的に再開されます。</string>
+    <string>オンにすると、最後の一時停止から選択した時間内にエピソードを再生した際にスリープタイマーが自動的に再開されます。</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>自動再開の有効時間</string>
     <key>back</key>
     <string>戻る</string>
     <key>banner_ads_info_label</key>

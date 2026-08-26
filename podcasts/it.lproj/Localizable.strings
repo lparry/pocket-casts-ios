@@ -300,7 +300,9 @@ Scarica l'app per provare l'esperienza completa!</string>
     <key>auto_restart_sleep_timer</key>
     <string>Riavvia automaticamente l'autospegnimento</string>
     <key>auto_restart_sleep_timer_description</key>
-    <string>Quando è attivato, l'autospegnimento si riavvia automaticamente se riproduci un episodio entro 5 minuti dall'ultima pausa.</string>
+    <string>Quando è attivato, l'autospegnimento si riavvia automaticamente se riproduci un episodio entro l'intervallo selezionato dall'ultima pausa.</string>
+    <key>auto_restart_sleep_timer_window</key>
+    <string>Riavvia entro</string>
     <key>back</key>
     <string>Indietro</string>
     <key>banner_ads_info_label</key>

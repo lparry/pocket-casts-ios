@@ -11,6 +11,11 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
 
     private(set) var player: AVPlayer?
 
+    private let playbackStarts = PlaybackStartRequests()
+    private var playbackStartObservers: [PlaybackStartObserver] = []
+    private var retryPlayback: ((String) -> Bool)?
+    private var hasHandledPlaybackFailure = false
+
     private var requiredPlaybackRate: Double = 0
     private var shouldKeepPlaying = false
     private var volumeBoostEnabled = false
@@ -210,20 +215,70 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         return 0
     }
 
-    func play(completion: (() -> Void)? = nil) {
-        startBackgroundTask()
+    func play(completion: (() -> Void)?, failure: (() -> Void)?) {
+        play(completion: completion, failure: failure, retry: nil)
+    }
 
+    func play(completion: (() -> Void)?, failure: (() -> Void)?, retry: ((String) -> Bool)?) {
+        guard Thread.isMainThread else {
+            let generation = playbackStarts.generation
+            DispatchQueue.main.async {
+                guard self.playbackStarts.generation == generation else {
+                    failure?()
+                    return
+                }
+                self.play(completion: completion, failure: failure, retry: retry)
+            }
+            return
+        }
+        guard let player else {
+            failure?()
+            return
+        }
+
+        // Stall/rate recovery must not cancel an intent's initial seek with a second seek.
+        if completion == nil, failure == nil, playbackStartObservers.contains(where: { $0.request.isPending }) {
+            performSetPlaybackRate()
+            return
+        }
+
+        let request = playbackStarts.begin(completion: completion, failure: failure)
+        // Internal rate/stall recovery calls must preserve the caller's retry handler.
+        if let retry { retryPlayback = retry }
         shouldKeepPlaying = true
+        guard !checkIfPlayerFailed(), request.isPending else { return }
+        let observer = PlaybackStartObserver(player: player, request: request, onFailure: { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, request.isPending else { return }
+                _ = self.checkIfPlayerFailed()
+            }
+        }, onTimeout: { [weak self] in
+            self?.pause()
+            self?.endBackgroundTask()
+        })
+        request.whenResolved { [weak self] in
+            DispatchQueue.main.async {
+                self?.playbackStartObservers.removeAll { !$0.request.isPending }
+            }
+        }
+        playbackStartObservers.removeAll { !$0.request.isPending }
+        playbackStartObservers.append(observer)
+
+        startBackgroundTask()
         effectsDidChange()
         performSetPlaybackRate()
-        jumpToStartingPosition()
-
-        player?.volume = 1
-
-        completion?()
+        jumpToStartingPosition { [weak self] finished in
+            DispatchQueue.main.async {
+                guard request.isPending else { return }
+                if !finished { _ = self?.checkIfPlayerFailed() }
+                observer.didFinishSeek(finished)
+            }
+        }
+        player.volume = 1
     }
 
     func pause() {
+        playbackStarts.cancel()
         shouldKeepPlaying = false
         player?.pause()
     }
@@ -244,18 +299,25 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         }
     }
 
-    func seekTo(_ time: TimeInterval, completion: (() -> Void)?) {
+    func seekTo(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?) {
         let adjustedTime = fmax(0.1, time)
 
         let timeToSeekTo = CMTimeMake(value: Int64(adjustedTime * 100), timescale: 100)
         let tolerance = CMTime.zero // in testing setting this to 1 second wasn't honoured and it would sometimes be 10 seconds out. So go for accuracy over seek speed here
 
-        player?.seek(to: timeToSeekTo, toleranceBefore: tolerance, toleranceAfter: tolerance, completionHandler: { finished in
+        guard let player else {
+            failure?()
+            return
+        }
+
+        player.seek(to: timeToSeekTo, toleranceBefore: tolerance, toleranceAfter: tolerance, completionHandler: { finished in
             if finished {
                 if !self.playing(), self.shouldKeepPlaying {
                     self.play(completion: nil)
                 }
                 completion?()
+            } else {
+                failure?()
             }
         })
     }
@@ -346,6 +408,9 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         guard let player, player.currentItem?.status == .failed  || player.status == .failed else {
             return false
         }
+        guard shouldKeepPlaying else { return true }
+        guard !hasHandledPlaybackFailure else { return true }
+        hasHandledPlaybackFailure = true
         let playerErrorMessage =  (player.error as? NSError)?.debugDescription ?? ""
         let playerItemErrorMessage = (player.currentItem?.error as? NSError)?.debugDescription ?? ""
         FileLog.shared.addMessage("[DefaultPlayer] Playback did fail with error: \(playerErrorMessage) | \(playerItemErrorMessage)")
@@ -353,14 +418,30 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         // Give priority to player item error
         let playerError: Error? = (player.currentItem?.error ?? player.error)
         let playerNSError = playerError as? NSError
+        let logMessage = "AVPlayerItemStatusFailed on currentItem: \(playerErrorMessage) - \(playerItemErrorMessage)"
+
+        if let playerNSError, playerNSError.isOutOfStorage {
+            PlaybackManager.shared.playbackDidFail(error: .notEnoughStorage(logMessage: logMessage))
+            return true
+        }
 
         if let playerNSError, playerNSError.domain == NSURLErrorDomain, playerNSError.code != NSURLErrorNotConnectedToInternet,
            let episodeUuid {
-            if PlaybackManager.shared.retryUrlLoad(for: episodeUuid) {
-                return false
+            let pending = playbackStarts.takePending()
+            let retried: Bool
+            if let retryPlayback {
+                retried = retryPlayback(episodeUuid)
+                if retried { pending.forEach { $0.discard() } }
+            } else {
+                retried = PlaybackManager.shared.retryUrlLoad(
+                    for: episodeUuid,
+                    completion: { pending.forEach { $0.finish(success: true) } },
+                    failure: { pending.forEach { $0.finish(success: false) } }
+                )
             }
+            if retried { return false }
+            pending.forEach { $0.finish(success: false) }
         }
-        let logMessage = "AVPlayerItemStatusFailed on currentItem: \(playerErrorMessage) - \(playerItemErrorMessage)"
         var error: PlaybackManager.PlaybackError = .playbackError(logMessage: logMessage, isLocalFile: isPlayingLocalFile)
         if let playerNSError,
            playerNSError.domain == NSURLErrorDomain {
@@ -372,12 +453,17 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
                 error = .episodeNotAvailable(errorCode: playerNSError.code, logMessage: logMessage)
             }
         }
+        playbackStarts.cancel()
         PlaybackManager.shared.playbackDidFail(error: error)
 
         return true
     }
 
     private func playerStatusDidChange() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.playerStatusDidChange() }
+            return
+        }
         guard !checkIfPlayerFailed() else {
             return
         }
@@ -406,6 +492,7 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
             isWaitingForInitialPlayback = false
         }
 
+        playbackStartObservers.forEach { $0.update() }
         PlaybackManager.shared.playerDidChangeNowPlayingInfo()
     }
 
@@ -767,15 +854,20 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         player?.rate = Float(effectiveRate)
     }
 
-    private func jumpToStartingPosition() {
+    private func jumpToStartingPosition(completion: @escaping (Bool) -> Void) {
+        guard let player else {
+            completion(false)
+            return
+        }
         let startingTime = PlaybackManager.shared.requiredStartingPosition()
 
-        // there's a bug that when playing over AirPlay to a HomePod, seeking in stream that's already where you are up to sometimes doesn't work, this is a weird workaround for that case
-        // https://github.com/shiftyjelly/pocketcasts-ios/issues/1936 is worth a read if you ever come here thinking you want to change this code
+        // Avoid a redundant seek when resuming over AirPlay.
         if round(startingTime) != round(currentTime()) {
-            seekTo(startingTime, completion: nil)
+            let time = CMTimeMake(value: Int64(max(0.1, startingTime) * 100), timescale: 100)
+            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: completion)
+        } else {
+            completion(true)
         }
-
         PlaybackManager.shared.playerDidFinishPreparing()
     }
 
@@ -819,6 +911,7 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
     private func handlePlaybackError(_ message: String) {
         // only reports errors if we're meant to be playing
         if shouldKeepPlaying {
+            playbackStarts.cancel()
             shouldKeepPlaying = false
             PlaybackManager.shared.playbackDidFail(error: .playbackError(logMessage: message, isLocalFile: isPlayingLocalFile))
         }
@@ -948,11 +1041,16 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         playFailedObserver = nc.addObserver(forName: NSNotification.Name.AVPlayerItemFailedToPlayToEndTime, object: nil, queue: nil) { [weak self] notification in
             guard let self else { return }
 
+            self.playbackStarts.cancel()
             self.shouldKeepPlaying = false
 
             let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             let errorMessage = error?.localizedDescription ?? "Unknown item did fail to finish error"
-            PlaybackManager.shared.playbackDidFail(error: .playbackError(logMessage: errorMessage, isLocalFile: isPlayingLocalFile))
+            if let nsError = error as? NSError, nsError.isOutOfStorage {
+                PlaybackManager.shared.playbackDidFail(error: .notEnoughStorage(logMessage: errorMessage))
+            } else {
+                PlaybackManager.shared.playbackDidFail(error: .playbackError(logMessage: errorMessage, isLocalFile: isPlayingLocalFile))
+            }
         }
 
         playStalledObserver = nc.addObserver(forName: NSNotification.Name.AVPlayerItemPlaybackStalled, object: nil, queue: nil) { [weak self] _ in
@@ -974,6 +1072,10 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
     }
 
     private func cleanupPlayer() {
+        playbackStarts.cancel()
+        playbackStartObservers = []
+        retryPlayback = nil
+        hasHandledPlaybackFailure = false
         player?.currentItem?.audioMix = nil
         durationObserver = nil
         rateObserver = nil
@@ -1025,5 +1127,90 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
 
     func setVolume(_ volume: Float) {
         player?.volume = volume
+    }
+}
+
+extension NSError {
+    /// Whether this error, or any error underlying it, reports that the device has run out of storage.
+    var isOutOfStorage: Bool {
+        var error: NSError? = self
+        var depth = 0
+        while let current = error, depth < 10 {
+            depth += 1
+            switch (current.domain, current.code) {
+            case (NSCocoaErrorDomain, NSFileWriteOutOfSpaceError),
+                 (NSPOSIXErrorDomain, Int(ENOSPC)),
+                 (AVFoundationErrorDomain, AVError.Code.diskFull.rawValue):
+                return true
+            default:
+                error = current.userInfo[NSUnderlyingErrorKey] as? NSError
+            }
+        }
+        return false
+    }
+}
+
+/// AVPlayer accepting a rate is not a successful start: the initial seek and buffering may still fail.
+final class PlaybackStartObserver {
+    let request: PlaybackStartRequest
+    private let player: AVPlayer
+    private let seekFinished = AtomicBool()
+    private var timeControlObservation: NSKeyValueObservation?
+    private var playerStatusObservation: NSKeyValueObservation?
+    private var itemStatusObservation: NSKeyValueObservation?
+    private let onFailure: (() -> Void)?
+
+    init(player: AVPlayer, request: PlaybackStartRequest, onFailure: (() -> Void)? = nil, timeout: TimeInterval? = nil, onTimeout: @escaping () -> Void = {}) {
+        self.player = player
+        self.request = request
+        self.onFailure = onFailure
+        timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] _, _ in
+            self?.update()
+        }
+        playerStatusObservation = player.observe(\.status, options: [.initial, .new]) { [weak self] _, _ in
+            self?.update()
+        }
+        itemStatusObservation = player.currentItem?.observe(\.status, options: [.initial, .new]) { [weak self] _, _ in
+            self?.update()
+        }
+        request.whenResolved { [weak self] in
+            // Player callbacks can arrive on AVFoundation's own queue.
+            DispatchQueue.main.async { self?.invalidate() }
+        }
+        if let timeout { request.startTimeout(after: timeout, onTimeout: onTimeout) }
+    }
+
+    private func invalidate() {
+        timeControlObservation?.invalidate()
+        timeControlObservation = nil
+        playerStatusObservation?.invalidate()
+        playerStatusObservation = nil
+        itemStatusObservation?.invalidate()
+        itemStatusObservation = nil
+    }
+
+    func didFinishSeek(_ finished: Bool) {
+        guard finished else {
+            request.finish(success: false)
+            return
+        }
+        seekFinished.value = true
+        update()
+    }
+
+    func update() {
+        guard request.isPending else { return }
+        if player.status == .failed || player.currentItem?.status == .failed {
+            if let onFailure {
+                onFailure()
+            } else {
+                request.finish(success: false)
+            }
+            return
+        }
+        guard seekFinished.value, player.status == .readyToPlay,
+              player.currentItem?.status == .readyToPlay,
+              player.timeControlStatus == .playing else { return }
+        request.finish(success: true)
     }
 }

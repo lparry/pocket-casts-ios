@@ -1,3 +1,4 @@
+import AppIntents
 import IntentsUI
 import PocketCastsDataModel
 import PocketCastsUtils
@@ -14,12 +15,14 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
             tableView.estimatedRowHeight = Constants.Values.tableRowHeaderHeight
             tableView.sectionHeaderHeight = UITableView.automaticDimension
             tableView.estimatedSectionHeaderHeight = Constants.Values.tableSectionHeaderHeight
+            tableView.sectionFooterHeight = UITableView.automaticDimension
+            tableView.estimatedSectionFooterHeight = 64
         }
     }
 
     @IBOutlet var activityIndicator: ThemeLoadingIndicator!
     @IBOutlet var errorView: UIStackView!
-    var suggestedShortcuts: [INShortcut]!
+    var suggestedShortcuts: [AppShortcutSuggestion]!
     var enabledShortcuts: [INVoiceShortcut]!
 
     private enum sections { case enabledSection, suggestedSection, playSection }
@@ -35,7 +38,7 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
         title = L10n.settingsSiriShortcuts
         activityIndicator.isHidden = false
         activityIndicator.startAnimating()
-        suggestedShortcuts = SiriShortcutsManager.shared.defaultSuggestions()
+        suggestedShortcuts = SiriShortcutsManager.shared.appShortcutSuggestions()
         enabledShortcuts = [INVoiceShortcut]()
         insetAdjuster.setupInsetAdjustmentsForMiniPlayer(scrollView: tableView)
         Analytics.track(.settingsSiriShown)
@@ -92,9 +95,9 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
         case .suggestedSection:
             let cell = tableView.dequeueReusableCell(withIdentifier: suggestedCellId) as! SiriShortcutSuggestedCell
             let shortcut = suggestedShortcuts[indexPath.row]
-            if let intent = shortcut.intent {
-                cell.titleLabel?.text = intent.suggestedInvocationPhrase
-            }
+            cell.titleLabel?.text = shortcut.title
+            cell.addIcon.image = UIImage(systemName: shortcut.systemImageName)
+            cell.selectionStyle = .none
             return cell
         case .playSection:
             let cell = tableView.dequeueReusableCell(withIdentifier: disclosureCelld) as! SiriShortcutDisclosureCell
@@ -120,10 +123,7 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
             present(viewController, animated: true, completion: nil)
 
         case .suggestedSection:
-            let viewController = INUIAddVoiceShortcutViewController(shortcut: suggestedShortcuts[indexPath.row])
-            viewController.modalPresentationStyle = .formSheet
-            viewController.delegate = self
-            present(viewController, animated: true, completion: nil)
+            break
         case .playSection:
             let row = playRows[indexPath.row]
             switch row {
@@ -134,6 +134,21 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
             }
         }
         tableView.deselectRow(at: indexPath, animated: false)
+    }
+
+    func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        guard tableData[section] == .suggestedSection else { return nil }
+
+        let footer = UIView()
+        let shortcutsButton = ShortcutsUIButton(style: .automatic)
+        shortcutsButton.translatesAutoresizingMaskIntoConstraints = false
+        footer.addSubview(shortcutsButton)
+        NSLayoutConstraint.activate([
+            shortcutsButton.centerXAnchor.constraint(equalTo: footer.centerXAnchor),
+            shortcutsButton.topAnchor.constraint(equalTo: footer.topAnchor, constant: 8),
+            shortcutsButton.bottomAnchor.constraint(equalTo: footer.bottomAnchor, constant: -16),
+        ])
+        return footer
     }
 
     private func showPodcastShortcutsViewController() {
@@ -194,11 +209,6 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
 
             if allVoiceShortcuts != nil, error == nil {
                 self.enabledShortcuts = allVoiceShortcuts
-                for voiceShortcut in self.enabledShortcuts {
-                    if SiriShortcutsManager.shared.isDefaultSuggestion(voiceShortcut: voiceShortcut) {
-                        self.suggestedShortcuts.removeAll(where: { $0.intent?.suggestedInvocationPhrase == voiceShortcut.shortcut.intent?.suggestedInvocationPhrase })
-                    }
-                }
                 DispatchQueue.main.async {
                     self.activityIndicator.stopAnimating()
                     self.reloadData()
@@ -217,18 +227,6 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
     }
 
     private func deleteEnabledShortcut(voiceShortcut: INVoiceShortcut) {
-        if SiriShortcutsManager.shared.isDefaultSuggestion(voiceShortcut: voiceShortcut) {
-            if let chapterIntent = voiceShortcut.shortcut.intent as? SJChapterIntent {
-                // the following is a special case as we replace SJChapterIntent with a INPlayMediaIntent in v7.8.1
-                if chapterIntent.skipForward == .next {
-                    suggestedShortcuts.append(SiriShortcutsManager.shared.nextChapterShortcut())
-                } else {
-                    suggestedShortcuts.append(SiriShortcutsManager.shared.previousChapterShortcut())
-                }
-            } else {
-                suggestedShortcuts.append(voiceShortcut.shortcut)
-            }
-        }
         if let index = enabledShortcuts.firstIndex(of: voiceShortcut) {
             enabledShortcuts.remove(at: index)
         }
@@ -250,9 +248,6 @@ class SiriSettingsViewController: PCViewController, UITableViewDelegate, UITable
     func addVoiceShortcutViewController(_ controller: INUIAddVoiceShortcutViewController, didFinishWith voiceShortcut: INVoiceShortcut?, error: Error?) {
         if let voiceShortcut {
             enabledShortcuts.append(voiceShortcut)
-            if let index = suggestedShortcuts.firstIndex(of: voiceShortcut.shortcut) {
-                suggestedShortcuts.remove(at: index)
-            }
         }
         tableView.reloadData()
         navigationController?.popToViewController(self, animated: false)

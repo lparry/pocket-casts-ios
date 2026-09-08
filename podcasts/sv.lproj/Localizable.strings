@@ -3615,6 +3615,8 @@ Här är ett %1$@ gästpass för Pocket Casts Plus – min favoritpodcastspelare
     <string>Spela det översta avsnittet i %1$@</string>
     <key>siri_shortcut_play_podcast_phrase</key>
     <string>Spela %1$@</string>
+    <key>siri_shortcut_play_suggested_intent_title</key>
+    <string>Spela ett föreslaget avsnitt</string>
     <key>siri_shortcut_play_suggested_podcast_phrase</key>
     <string>Spela ett föreslaget avsnitt</string>
     <key>siri_shortcut_play_suggested_podcast_suggested_title</key>
@@ -3623,6 +3625,8 @@ Här är ett %1$@ gästpass för Pocket Casts Plus – min favoritpodcastspelare
     <string>Spelar upp ett föreslaget avsnitt</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Nästa</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Spela nästa avsnitt</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Spelar upp nästa avsnitt</string>
     <key>siri_shortcut_previous_chapter</key>
@@ -3630,7 +3634,7 @@ Här är ett %1$@ gästpass för Pocket Casts Plus – min favoritpodcastspelare
     <key>siri_shortcut_resume_phrase</key>
     <string>Återuppta</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Återupptar aktuellt avsnitt</string>
+    <string>Återuppta aktuellt avsnitt</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Skapa genväg till podcast</string>
     <key>skip_back</key>

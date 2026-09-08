@@ -3608,6 +3608,8 @@ Aquí tens una invitació de  %1$@ per a Pocket Casts Plus, el meu reproductor d
     <string>Reprodueix el primer %1$@</string>
     <key>siri_shortcut_play_podcast_phrase</key>
     <string>Reprodueix %1$@</string>
+    <key>siri_shortcut_play_suggested_intent_title</key>
+    <string>Reprodueix un capítol recomanat</string>
     <key>siri_shortcut_play_suggested_podcast_phrase</key>
     <string>Reprodueix un capítol recomanat</string>
     <key>siri_shortcut_play_suggested_podcast_suggested_title</key>
@@ -3616,6 +3618,8 @@ Aquí tens una invitació de  %1$@ per a Pocket Casts Plus, el meu reproductor d
     <string>Reproduint un capítol recomanat</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Tot seguit</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Reprodueix l’episodi següent</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Reproduint el capítol següent</string>
     <key>siri_shortcut_previous_chapter</key>
@@ -3623,7 +3627,7 @@ Aquí tens una invitació de  %1$@ per a Pocket Casts Plus, el meu reproductor d
     <key>siri_shortcut_resume_phrase</key>
     <string>Reprèn</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Reprenent el capítol actual</string>
+    <string>Reprèn el capítol actual</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Crea una drecera al pòdcast</string>
     <key>skip_back</key>

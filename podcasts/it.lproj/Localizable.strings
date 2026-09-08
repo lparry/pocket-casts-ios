@@ -3615,6 +3615,8 @@ Questo è un pass per ospiti %1$@ per Pocket Casts Plus, il mio podcast player p
     <string>Riproduci %1$@ principale</string>
     <key>siri_shortcut_play_podcast_phrase</key>
     <string>Riproduci %1$@</string>
+    <key>siri_shortcut_play_suggested_intent_title</key>
+    <string>Riproduci un episodio suggerito</string>
     <key>siri_shortcut_play_suggested_podcast_phrase</key>
     <string>Riproduci un episodio suggerito</string>
     <key>siri_shortcut_play_suggested_podcast_suggested_title</key>
@@ -3623,6 +3625,8 @@ Questo è un pass per ospiti %1$@ per Pocket Casts Plus, il mio podcast player p
     <string>Riproduzione in corso...</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>Prossimo</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Riproduci l’episodio successivo</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Riproduzione in corso...</string>
     <key>siri_shortcut_previous_chapter</key>
@@ -3630,7 +3634,7 @@ Questo è un pass per ospiti %1$@ per Pocket Casts Plus, il mio podcast player p
     <key>siri_shortcut_resume_phrase</key>
     <string>Riprendi</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Ripresa in corso...</string>
+    <string>Riprendi l'episodio corrente</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Crea una scorciatoia al podcast</string>
     <key>skip_back</key>

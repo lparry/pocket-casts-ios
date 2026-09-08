@@ -3261,7 +3261,7 @@
 "siri_shortcut_previous_chapter" = "Previous chapter";
 
 /* Siri shortcut title for resuming the current episode */
-"siri_shortcut_resume_title" = "Resuming Current Episode";
+"siri_shortcut_resume_title" = "Resume Current Episode";
 
 /* Siri shortcut invocation phrase for resuming the current episode */
 "siri_shortcut_resume_phrase" = "Resume";
@@ -6771,4 +6771,3 @@
 "siri_intent_definition_key_xdnqvn" = "Container";
 
 "siri_intent_definition_key_zvlpk3" = "Skipped chapter";
-

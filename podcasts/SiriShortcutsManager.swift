@@ -4,6 +4,11 @@ import PocketCastsDataModel
 import PocketCastsServer
 import PocketCastsUtils
 
+struct AppShortcutSuggestion: Equatable {
+    let title: String
+    let systemImageName: String
+}
+
 class SiriShortcutsManager: CustomObserver {
     static let shared = SiriShortcutsManager()
 
@@ -19,14 +24,31 @@ class SiriShortcutsManager: CustomObserver {
     }
 
     func defaultSuggestions() -> [INShortcut] {
-        var shortcuts = [resumeLastShortcut(), pauseShortcut(), playNextShortcut(), nextChapterShortcut(), previousChapterShortcut(), markAsPlayedShortcut(), sleepTimerShortcut(), extendSleepTimerShortcut()]
+        // App Shortcuts are registered automatically by PocketCastsAppShortcutsProvider,
+        // so don't continue donating their legacy equivalents.
+        return []
+    }
 
-        // only signed in users can use the play suggested shortcut
-        if SyncManager.isUserLoggedIn() {
-            shortcuts.insert(playSuggestedShortcut(), at: 2)
+    func appShortcutSuggestions(isUserLoggedIn: Bool = SyncManager.isUserLoggedIn()) -> [AppShortcutSuggestion] {
+        var suggestions = [
+            AppShortcutSuggestion(title: String(localized: SetSleepTimerIntent.title), systemImageName: "moon.zzz.fill"),
+            AppShortcutSuggestion(title: String(localized: ExtendSleepTimerIntent.title), systemImageName: "timer"),
+            AppShortcutSuggestion(title: String(localized: ResumePlaybackIntent.title), systemImageName: "play.fill"),
+            AppShortcutSuggestion(title: String(localized: PausePlaybackIntent.title), systemImageName: "pause.fill"),
+            AppShortcutSuggestion(title: String(localized: PlayUpNextIntent.title), systemImageName: "text.line.first.and.arrowtriangle.forward"),
+            AppShortcutSuggestion(title: String(localized: NextChapterIntent.title), systemImageName: "forward.end.fill"),
+            AppShortcutSuggestion(title: String(localized: PreviousChapterIntent.title), systemImageName: "backward.end.fill"),
+            AppShortcutSuggestion(title: String(localized: MarkAsPlayedIntent.title), systemImageName: "checkmark.circle.fill"),
+        ]
+
+        if isUserLoggedIn {
+            suggestions.insert(
+                AppShortcutSuggestion(title: String(localized: PlaySuggestedIntent.title), systemImageName: "sparkles"),
+                at: 5
+            )
         }
 
-        return shortcuts
+        return suggestions
     }
 
     func addDefaultSuggestions() {
@@ -35,10 +57,6 @@ class SiriShortcutsManager: CustomObserver {
 
     func removeAllSuggestions() {
         INVoiceShortcutCenter.shared.setShortcutSuggestions([])
-    }
-
-    func isDefaultSuggestion(voiceShortcut: INVoiceShortcut) -> Bool {
-        defaultSuggestions().contains { $0.intent?.suggestedInvocationPhrase == voiceShortcut.shortcut.intent?.suggestedInvocationPhrase }
     }
 
     func voiceShortcutForPodcast(podcast: Podcast, completion: @escaping ((INVoiceShortcut?) -> Void)) {
@@ -82,26 +100,6 @@ class SiriShortcutsManager: CustomObserver {
 
     // MARK: Shortcuts
 
-    func resumeLastShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: resumeLastIntent())
-        return shortcut!
-    }
-
-    func pauseShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: pauseIntent())
-        return shortcut!
-    }
-
-    func playNextShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: playNextIntent())
-        return shortcut!
-    }
-
-    func playSuggestedShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: playSuggestedIntent())
-        return shortcut!
-    }
-
     func playPodcastShortcut(podcast: Podcast) -> INShortcut {
         let shortcut = INShortcut(intent: playPodcastIntent(podcast: podcast))
         return shortcut!
@@ -132,45 +130,7 @@ class SiriShortcutsManager: CustomObserver {
         return shortcut!
     }
 
-    func markAsPlayedShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: markAsPlayedIntent())
-        return shortcut!
-    }
-
-    func sleepTimerShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: setSleepTimerIntent())
-        return shortcut!
-    }
-
-    func extendSleepTimerShortcut() -> INShortcut {
-        let shortcut = INShortcut(intent: setExtendSleepTimerIntent())
-        return shortcut!
-    }
-
     // MARK: Intents
-
-    func resumeLastIntent() -> INIntent {
-        let artwork = INImage(named: "siri_play")
-        let episode = INMediaItem(identifier: Constants.SiriActions.resumeId,
-                                  title: L10n.siriShortcutResumeTitle,
-                                  type: .podcastEpisode,
-                                  artwork: artwork)
-
-        let intent = INPlayMediaIntent(mediaItems: [episode], mediaContainer: nil, playShuffled: false, playbackRepeatMode: .one, resumePlayback: true)
-        intent.suggestedInvocationPhrase = L10n.siriShortcutResumePhrase
-        return intent
-    }
-
-    func pauseIntent() -> INIntent {
-        let episode = INMediaItem(identifier: Constants.SiriActions.pauseId,
-                                  title: L10n.siriShortcutPauseTitle,
-                                  type: .podcastEpisode,
-                                  artwork: nil)
-
-        let intent = INPlayMediaIntent(mediaItems: [episode], mediaContainer: nil, playShuffled: false, playbackRepeatMode: .none, resumePlayback: false)
-        intent.suggestedInvocationPhrase = L10n.siriShortcutPausePhrase
-        return intent
-    }
 
     func playPodcastIntent(podcast: Podcast) -> INIntent {
         playPodcastIntent(podcastTitle: podcast.title ?? L10n.podcastSingular, podcastUuid: podcast.uuid)
@@ -245,34 +205,6 @@ class SiriShortcutsManager: CustomObserver {
         return intent
     }
 
-    func playNextIntent() -> INIntent {
-        let artwork = INImage(named: "siri_upnext")
-        let episode = INMediaItem(identifier: Constants.SiriActions.playUpNextId,
-                                  title: L10n.siriShortcutPlayUpNextTitle,
-                                  type: .podcastEpisode,
-                                  artwork: artwork)
-
-        let intent = INPlayMediaIntent(mediaItems: [episode], mediaContainer: nil, playShuffled: false, playbackRepeatMode: .none, resumePlayback: true)
-        intent.suggestedInvocationPhrase = L10n.siriShortcutPlayUpNextPhrase
-        return intent
-    }
-
-    func playSuggestedIntent() -> INIntent {
-        let episode = INMediaItem(identifier: Constants.SiriActions.playSuggestedId,
-                                  title: L10n.siriShortcutPlaySuggestedPodcastTitle,
-                                  type: .podcastEpisode,
-                                  artwork: nil)
-        let artwork = INImage(named: "siri_suggested")
-        let suggestedTitle = L10n.siriShortcutPlaySuggestedPodcastSuggestedTitle
-        let container = INMediaItem(identifier: Constants.SiriActions.playSuggestedId,
-                                    title: suggestedTitle,
-                                    type: .podcastPlaylist,
-                                    artwork: artwork)
-        let intent = INPlayMediaIntent(mediaItems: [episode], mediaContainer: container, playShuffled: false, playbackRepeatMode: .none, resumePlayback: true)
-        intent.suggestedInvocationPhrase = L10n.siriShortcutPlaySuggestedPodcastPhrase
-        return intent
-    }
-
     // MARK: - Chapter intents
 
     func nextChapterIntent() -> INIntent {
@@ -296,36 +228,6 @@ class SiriShortcutsManager: CustomObserver {
 
         let intent = INPlayMediaIntent(mediaItems: [episode], mediaContainer: nil, playShuffled: false, playbackRepeatMode: .none, resumePlayback: true)
         intent.suggestedInvocationPhrase = L10n.siriShortcutPreviousChapter
-        return intent
-    }
-
-    // MARK: - Mark as played intent
-
-    func markAsPlayedIntent() -> INIntent {
-        let episode = INMediaItem(identifier: Constants.SiriActions.markAsPlayedId,
-                                  title: L10n.siriShortcutMarkAsPlayedTitle,
-                                  type: .podcastEpisode,
-                                  artwork: nil)
-
-        let intent = INPlayMediaIntent(mediaItems: [episode], mediaContainer: nil, playShuffled: false, playbackRepeatMode: .none, resumePlayback: false)
-        intent.suggestedInvocationPhrase = L10n.siriShortcutMarkAsPlayedPhrase
-        return intent
-    }
-
-    // MARK: - Timer intents
-
-    func setSleepTimerIntent() -> INIntent {
-        let intent = SJSleepTimerIntent()
-        intent.minutes = Settings.customSleepTime() as NSNumber
-        let formattedTime = TimeFormatter.shared.minutesHoursFormatted(time: Settings.customSleepTime())
-        intent.suggestedInvocationPhrase = L10n.siriShortcutExtendSleepTimer(formattedTime)
-        return intent
-    }
-
-    func setExtendSleepTimerIntent() -> INIntent {
-        let intent = SJExtendSleepTimerIntent()
-        intent.minutes = 5
-        intent.suggestedInvocationPhrase = L10n.siriShortcutExtendSleepTimerFiveMin
         return intent
     }
 
@@ -359,10 +261,15 @@ class SiriShortcutsManager: CustomObserver {
         return INPlayMediaIntentResponseCode.failureNoUnplayedContent
     }
 
-    func pausePlayback() -> INPlayMediaIntentResponseCode {
+    @MainActor
+    func pausePlayback(
+        using playbackPauser: any FixedSiriShortcutPlaybackPausing = PlaybackManager.shared
+    ) -> INPlayMediaIntentResponseCode {
         AnalyticsHelper.siriPause()
-        AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
-        PlaybackManager.shared.pause()
+        if playbackPauser.isPlaying {
+            AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+        }
+        playbackPauser.pause(userInitiated: true)
         return INPlayMediaIntentResponseCode.success
     }
 
@@ -388,23 +295,97 @@ class SiriShortcutsManager: CustomObserver {
 
     func playSuggested() -> INPlayMediaIntentResponseCode {
         AnalyticsHelper.siriSurpriseMe()
-        let recommendationHelper = RecommendationHelper()
-        guard let episodeInfo = recommendationHelper.recommendEpisode() else {
+        guard let episodeInfo = RecommendationHelper().recommendEpisode() else {
             return INPlayMediaIntentResponseCode.failureRequiringAppLaunch
         }
 
-        if let episode = DataManager.sharedManager.findEpisode(uuid: episodeInfo.uuid) {
-            AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
-            PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
-        } else {
-            ServerPodcastManager.shared.addFromUuid(podcastUuid: episodeInfo.podcastUuid, subscribe: false, completion: { [weak self] success in
-                if let episode = DataManager.sharedManager.findEpisode(uuid: episodeInfo.uuid), success {
-                    AnalyticsPlaybackHelper.shared.currentSource = self?.analyticsSource
-                    PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
-                }
-            })
+        if playRecommendedEpisode(uuid: episodeInfo.uuid) {
+            return INPlayMediaIntentResponseCode.success
+        }
+
+        ServerPodcastManager.shared.addFromUuid(podcastUuid: episodeInfo.podcastUuid, subscribe: false) { [weak self] success in
+            _ = success ? self?.playRecommendedEpisode(uuid: episodeInfo.uuid) : false
         }
         return INPlayMediaIntentResponseCode.success
+    }
+
+    private func playRecommendedEpisode(uuid: String) -> Bool {
+        guard let episode = DataManager.sharedManager.findEpisode(uuid: uuid) else { return false }
+
+        AnalyticsPlaybackHelper.shared.currentSource = analyticsSource
+        PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
+        return true
+    }
+
+    @MainActor
+    func playSuggestedAsync(
+        using suggestedEpisodePlayer: any FixedSiriShortcutSuggestedEpisodePlaying = PlaybackManager.shared,
+        recommendEpisode: () async -> Episode? = {
+            await RecommendationHelper().recommendEpisodeAsync(timeout: BackgroundPlayback.current?.remainingTime)
+        }
+    ) async -> FixedSiriShortcutActionResult {
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        AnalyticsHelper.siriSurpriseMe()
+        let episodeInfo = await recommendEpisode()
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        guard let episodeInfo else {
+            return .unavailable
+        }
+
+        return await playSuggestedEpisode(
+            episodeUuid: episodeInfo.uuid,
+            podcastUuid: episodeInfo.podcastUuid,
+            using: suggestedEpisodePlayer,
+            fetchPodcast: { podcastUuid in
+                await withCheckedContinuation { continuation in
+                    ServerPodcastManager.shared.addFromUuid(podcastUuid: podcastUuid, subscribe: false) { success in
+                        continuation.resume(returning: success)
+                    }
+                }
+            }
+        )
+    }
+
+    @MainActor
+    func playSuggestedEpisode(
+        episodeUuid: String,
+        podcastUuid: String,
+        using suggestedEpisodePlayer: any FixedSiriShortcutSuggestedEpisodePlaying,
+        fetchPodcast: (String) async -> Bool
+    ) async -> FixedSiriShortcutActionResult {
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        let firstResult = await playRecommendedEpisodeAsync(uuid: episodeUuid, using: suggestedEpisodePlayer)
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        switch firstResult {
+        case .success:
+            return .success
+        case .playbackFailed:
+            return .playbackFailed
+        case .notFound:
+            break
+        }
+
+        guard BackgroundPlayback.canContinue, await fetchPodcast(podcastUuid), BackgroundPlayback.canContinue else { return .unavailable }
+
+        let fetchedResult = await playRecommendedEpisodeAsync(uuid: episodeUuid, using: suggestedEpisodePlayer)
+        guard BackgroundPlayback.canContinue else { return .unavailable }
+        switch fetchedResult {
+        case .success:
+            return .success
+        case .notFound:
+            return .unavailable
+        case .playbackFailed:
+            return .playbackFailed
+        }
+    }
+
+    @MainActor
+    func playRecommendedEpisodeAsync(
+        uuid: String,
+        using suggestedEpisodePlayer: any FixedSiriShortcutSuggestedEpisodePlaying
+    ) async -> FixedSiriShortcutSuggestedEpisodePlaybackResult {
+        guard BackgroundPlayback.canContinue else { return .playbackFailed }
+        return await suggestedEpisodePlayer.startSuggestedEpisode(uuid: uuid)
     }
 
     func skipToNextChapter() -> INPlayMediaIntentResponseCode {
@@ -441,8 +422,7 @@ class SiriShortcutsManager: CustomObserver {
         guard let minutes = TimeInterval(exactly: addTime) else { return false }
         let sixtySeconds: TimeInterval = 1.minutes
         let addSeconds = sixtySeconds * minutes
-        PlaybackManager.shared.extendSleepTimer(by: addSeconds, source: .siri)
-        return true
+        return PlaybackManager.shared.extendSleepTimer(by: addSeconds, source: .siri)
     }
 
     func playFilter(uuid: String) -> INPlayMediaIntentResponseCode {

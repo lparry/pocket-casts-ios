@@ -3615,6 +3615,8 @@ Aquí tienes un pase de invitado de %1$@ para Pocket Casts Plus, mi reproductor 
     <string>Reproducir el primer %1$@</string>
     <key>siri_shortcut_play_podcast_phrase</key>
     <string>Reproducir %1$@</string>
+    <key>siri_shortcut_play_suggested_intent_title</key>
+    <string>Reproducir un episodio recomendado</string>
     <key>siri_shortcut_play_suggested_podcast_phrase</key>
     <string>Reproducir un episodio recomendado</string>
     <key>siri_shortcut_play_suggested_podcast_suggested_title</key>
@@ -3623,14 +3625,16 @@ Aquí tienes un pase de invitado de %1$@ para Pocket Casts Plus, mi reproductor 
     <string>Reproduciendo un episodio recomendado</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>A continuación</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Reproducir el episodio siguiente</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Reproduciendo el siguiente episodio</string>
     <key>siri_shortcut_previous_chapter</key>
     <string>Capítulo anterior</string>
     <key>siri_shortcut_resume_phrase</key>
-    <string>Reactivar</string>
+    <string>Reanudar</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Reactivando el episodio actual</string>
+    <string>Reanudar el episodio actual</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Crear acceso directo al podcast</string>
     <key>skip_back</key>

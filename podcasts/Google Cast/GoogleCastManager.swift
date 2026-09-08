@@ -15,6 +15,9 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
 
     private var episodeToPlayOnConnect: BaseEpisode?
 
+    private var playbackStart: GoogleCastStartupObserver?
+    private var seekRequest: GoogleCastRequestObserver?
+
     private var pausing = false
     private var bufferingInitialPartOfEpisode = false
     private var clientReconnectOccured = false
@@ -36,6 +39,7 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
     }
 
     func teardown() {
+        cancelPlaybackStart()
         GCKCastContext.sharedInstance().sessionManager.remove(self)
         GCKCastContext.sharedInstance().discoveryManager.remove(deviceManager)
     }
@@ -139,14 +143,39 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
         session.remoteMediaClient?.setPlaybackRate(adjustedSpeed)
     }
 
-    func play() {
-        guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
-
+    func play(episodeUuid: String? = nil, completion: (() -> Void)? = nil, failure: (() -> Void)? = nil) {
+        cancelPlaybackStart()
+        guard let client = GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient,
+              connected() else {
+            failure?()
+            return
+        }
         pausing = false
-        session.remoteMediaClient?.play()
+        let uuid = episodeUuid ?? PlaybackManager.shared.currentEpisode?.uuid ?? ""
+        observeStartup(client: client, episodeUuid: uuid, completion: completion, failure: failure) {
+            client.play()
+        }
+    }
+
+    func cancelPlaybackStart() {
+        playbackStart?.cancel()
+        playbackStart = nil
+        seekRequest?.cancel()
+        seekRequest = nil
+    }
+
+    private func observeStartup(client: GCKRemoteMediaClient, episodeUuid: String, completion: (() -> Void)?, failure: (() -> Void)?, send: () -> GCKRequest) {
+        cancelPlaybackStart()
+        let observer = GoogleCastStartupObserver(client: client, episodeUuid: episodeUuid, completion: completion, failure: { [weak self] in
+            self?.bufferingInitialPartOfEpisode = false
+            failure?()
+        })
+        playbackStart = observer
+        observer.send(send)
     }
 
     func pause() {
+        cancelPlaybackStart()
         guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
 
         pausing = true
@@ -154,6 +183,7 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
     }
 
     func endPlayback() {
+        cancelPlaybackStart()
         episodeToPlayOnConnect = nil
         pausing = true
 
@@ -175,12 +205,18 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
         }
     }
 
-    func playSingleEpisode(_ episode: BaseEpisode) {
-        guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
+    func playSingleEpisode(_ episode: BaseEpisode, completion: (() -> Void)? = nil, failure: (() -> Void)? = nil) {
+        cancelPlaybackStart()
+        guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession,
+              let client = session.remoteMediaClient, connected() else {
+            failure?()
+            return
+        }
 
         // if we loaded this episode on connect and it's still playing it, no need to tell it to play again
         if episodeUuidLoadedOnConnect == episode.uuid, let playerState = session.remoteMediaClient?.mediaStatus?.playerState, playerState == .playing {
             episodeUuidLoadedOnConnect = ""
+            play(episodeUuid: episode.uuid, completion: completion, failure: failure)
             return
         }
 
@@ -238,7 +274,9 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
         loadOptions.autoplay = true
         loadOptions.playPosition = PlaybackManager.shared.requiredStartingPosition()
         loadOptions.playbackRate = adjustedSpeed
-        session.remoteMediaClient?.loadMedia(mediaInfo, with: loadOptions)
+        observeStartup(client: client, episodeUuid: episode.uuid, completion: completion, failure: failure) {
+            client.loadMedia(mediaInfo, with: loadOptions)
+        }
     }
 
     func canSeekToTime() -> Bool {
@@ -251,14 +289,21 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
         return false
     }
 
-    func seekToTime(_ time: TimeInterval) {
-        guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
-
-        if !canSeekToTime() { return }
+    func seekToTime(_ time: TimeInterval, completion: (() -> Void)?, failure: (() -> Void)?) {
+        guard let client = GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient,
+              canSeekToTime() else {
+            failure?()
+            return
+        }
 
         let seekOptions = GCKMediaSeekOptions()
         seekOptions.interval = time
-        session.remoteMediaClient?.seek(with: seekOptions)
+        seekRequest?.cancel()
+        let observer = GoogleCastRequestObserver(completion: completion, failure: failure)
+        seekRequest = observer
+        observer.send {
+            client.seek(with: seekOptions)
+        }
     }
 
     func streamPosition() -> TimeInterval {
@@ -344,12 +389,14 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
     }
 
     func sessionManager(_ sessionManager: GCKSessionManager, willEnd session: GCKCastSession) {
+        cancelPlaybackStart()
         session.remove(self)
         PlaybackManager.shared.remoteDeviceWillDisconnect()
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.googleCastStatusChanged)
     }
 
     func sessionManager(_ sessionManager: GCKSessionManager, didEnd session: GCKSession, withError error: Error?) {
+        cancelPlaybackStart()
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.googleCastStatusChanged)
         PlaybackManager.shared.remoteDeviceDisconnected()
     }
@@ -380,12 +427,120 @@ class GoogleCastManager: NSObject, GCKRemoteMediaClientListener, GCKSessionManag
         startMonitoring(session)
     }
 
+    func sessionManager(_ sessionManager: GCKSessionManager, didSuspend session: GCKSession, with reason: GCKConnectionSuspendReason) {
+        cancelPlaybackStart()
+    }
+
     private func startMonitoring(_ castSession: GCKCastSession) {
         castSession.remoteMediaClient?.remove(self)
         castSession.remoteMediaClient?.add(self)
     }
 
     private func stopMonitoring(_ castSession: GCKCastSession) {
+        cancelPlaybackStart()
         castSession.remoteMediaClient?.remove(self)
+    }
+}
+
+/// Keeps a Cast SDK command alive until the receiver acknowledges or rejects it.
+final class GoogleCastRequestObserver: NSObject, GCKRequestDelegate {
+    private let request: PlaybackStartRequest
+    private var command: GCKRequest?
+
+    init(completion: (() -> Void)?, failure: (() -> Void)?) {
+        request = PlaybackStartRequest(completion: completion, failure: failure)
+        super.init()
+        request.whenResolved { [weak self] in self?.detach() }
+    }
+
+    func send(_ send: () -> GCKRequest) {
+        let command = send()
+        self.command = command
+        command.delegate = self
+        if !command.inProgress {
+            cancel()
+        }
+    }
+
+    func cancel() {
+        request.finish(success: false)
+    }
+
+    func requestDidComplete(_ request: GCKRequest) {
+        self.request.finish(success: true)
+    }
+
+    func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+        cancel()
+    }
+
+    func request(_ request: GCKRequest, didAbortWith abortReason: GCKRequestAbortReason) {
+        cancel()
+    }
+
+    private func detach() {
+        command?.delegate = nil
+        if command?.inProgress == true { command?.cancel() }
+        command = nil
+    }
+}
+
+/// Tracks the SDK command separately from the receiver's actual playback status.
+final class GoogleCastStartupObserver: NSObject, GCKRequestDelegate, GCKRemoteMediaClientListener {
+    private let client: GCKRemoteMediaClient
+    private let start: RemotePlaybackStart
+    private var command: GCKRequest?
+
+    init(client: GCKRemoteMediaClient, episodeUuid: String, completion: (() -> Void)?, failure: (() -> Void)?) {
+        self.client = client
+        let request = PlaybackStartRequest(completion: completion, failure: failure)
+        start = RemotePlaybackStart(episodeUuid: episodeUuid, request: request)
+        super.init()
+        client.add(self)
+        request.whenResolved { [weak self] in self?.detach() }
+    }
+
+    func send(_ send: () -> GCKRequest) {
+        let command = send()
+        self.command = command
+        command.delegate = self
+        if !command.inProgress {
+            cancel()
+        }
+    }
+
+    func cancel() {
+        start.request.finish(success: false)
+    }
+
+    func requestDidComplete(_ request: GCKRequest) {
+        update(client.mediaStatus)
+        start.acknowledge()
+    }
+
+    func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+        cancel()
+    }
+
+    func request(_ request: GCKRequest, didAbortWith abortReason: GCKRequestAbortReason) {
+        cancel()
+    }
+
+    func remoteMediaClient(_ client: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
+        update(mediaStatus)
+    }
+
+    private func update(_ status: GCKMediaStatus?) {
+        guard let status else { return }
+        let uuid = (status.mediaInformation?.customData as? [String: String])?["EPISODE_UUID"]
+        start.update(episodeUuid: uuid, playing: status.playerState == .playing,
+                     failed: status.playerState == .idle && status.idleReason == .error)
+    }
+
+    private func detach() {
+        client.remove(self)
+        command?.delegate = nil
+        if command?.inProgress == true { command?.cancel() }
+        command = nil
     }
 }

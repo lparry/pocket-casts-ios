@@ -3615,6 +3615,8 @@ Voici un passe invité %1$@ pour Pocket Casts Plus, mon lecteur de podcast préf
     <string>Lire le meilleur %1$@</string>
     <key>siri_shortcut_play_podcast_phrase</key>
     <string>Lire %1$@</string>
+    <key>siri_shortcut_play_suggested_intent_title</key>
+    <string>Lire un épisode suggéré</string>
     <key>siri_shortcut_play_suggested_podcast_phrase</key>
     <string>Lire un épisode suggéré</string>
     <key>siri_shortcut_play_suggested_podcast_suggested_title</key>
@@ -3623,6 +3625,8 @@ Voici un passe invité %1$@ pour Pocket Casts Plus, mon lecteur de podcast préf
     <string>Lecture d’un épisode suggéré</string>
     <key>siri_shortcut_play_up_next_phrase</key>
     <string>File d’attente</string>
+    <key>siri_shortcut_play_up_next_intent_title</key>
+    <string>Lire l’épisode suivant</string>
     <key>siri_shortcut_play_up_next_title</key>
     <string>Lecture du prochain épisode</string>
     <key>siri_shortcut_previous_chapter</key>
@@ -3630,7 +3634,7 @@ Voici un passe invité %1$@ pour Pocket Casts Plus, mon lecteur de podcast préf
     <key>siri_shortcut_resume_phrase</key>
     <string>Reprendre</string>
     <key>siri_shortcut_resume_title</key>
-    <string>Reprise de l’épisode en cours</string>
+    <string>Reprendre l’épisode en cours</string>
     <key>siri_shortcut_to_podcast</key>
     <string>Créer un raccourci vers le podcast</string>
     <key>skip_back</key>

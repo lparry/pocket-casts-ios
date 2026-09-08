@@ -1,6 +1,13 @@
 8.21
 -----
-
+- Fix New Episodes push notifications still arriving after turning off Profile → Settings → Notifications → New Episodes [#5039](https://github.com/Automattic/pocket-casts-ios/pull/5039)
+- Fix portrait video episodes overflowing the player artwork area, overlapping the controls and episode title [#5058](https://github.com/Automattic/pocket-casts-ios/pull/5058)
+- Fix transcripts not showing for podcasts whose feeds serve them as plain text, such as those hosted on Transistor [#5055](https://github.com/Automattic/pocket-casts-ios/pull/5055)
+- Playback failures caused by a full disk now report a storage error instead of asking you to check your internet connection [#5056](https://github.com/Automattic/pocket-casts-ios/pull/5056)
+- Fix the Chromecast button being invisible in the fullscreen video player [#5060](https://github.com/Automattic/pocket-casts-ios/pull/5060)
+- Fix a memory leak that kept the episode details screen, its views and artwork in memory after it was closed [#5067](https://github.com/Automattic/pocket-casts-ios/pull/5067)
+- Fix the controls in the fullscreen video player being too small to tap reliably [#5059](https://github.com/Automattic/pocket-casts-ios/pull/5059)
+- Add App Shortcuts for resuming and pausing playback, playing Up Next or a suggested episode, skipping chapters, marking episodes as played and extending the sleep timer
 
 8.20
 -----
@@ -9,6 +16,7 @@
 - Add a Bluesky link to the About screen alongside Website, Instagram and X [#4998](https://github.com/Automattic/pocket-casts-ios/pull/4998)
 - Fix setting the sleep timer through Siri or Shortcuts while the device is locked [#4812](https://github.com/Automattic/pocket-casts-ios/pull/4812)
 - Fix a rare crash when starting episode downloads [#5001](https://github.com/Automattic/pocket-casts-ios/pull/5001)
+- Fix a rare crash on the Apple Watch while downloading episodes in the background [#5002](https://github.com/Automattic/pocket-casts-ios/pull/5002)
 - Tapping a Discover collection's poster now opens the expanded collection, the same as tapping "Show All" [#5028](https://github.com/Automattic/pocket-casts-ios/pull/5028)
 - Add support for "Networks" row in "Discover" [#5026](https://github.com/Automattic/pocket-casts-ios/pull/5026)
 - Add networks to search, including "Combined Results" and a new dedicated tab/filter [#5037](https://github.com/Automattic/pocket-casts-ios/pull/5037)

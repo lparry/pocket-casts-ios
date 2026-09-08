@@ -261,6 +261,13 @@ public enum FeatureFlag: String, CaseIterable {
     /// Enable the network discovery Discover sections and podcast page entry points
     case networkDiscovery
 
+    /// Tell the server that no podcast wants new episode pushes while the "New Episodes"
+    /// notification group is off, instead of relying on the named settings sync
+    case newEpisodeNotificationsPushOptOut
+
+    /// Enable the What's New feed
+    case whatsNewFeed
+
     public var enabled: Bool {
         if let overriddenValue = FeatureFlagOverrideStore().overriddenValue(for: self) {
             return overriddenValue
@@ -444,6 +451,10 @@ public enum FeatureFlag: String, CaseIterable {
         case .sleepTimerLiveActivity:
             true
         case .networkDiscovery:
+            BuildEnvironment.current == .debug
+        case .newEpisodeNotificationsPushOptOut:
+            true
+        case .whatsNewFeed:
             BuildEnvironment.current == .debug
         }
     }

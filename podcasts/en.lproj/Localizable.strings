@@ -3244,11 +3244,17 @@
 /* Siri shortcut title for playing a suggested podcast */
 "siri_shortcut_play_suggested_podcast_title" = "Playing a suggested episode";
 
+/* Title of the Play Suggested App Intent shown in the Shortcuts app */
+"siri_shortcut_play_suggested_intent_title" = "Play a Suggested Episode";
+
 /* Siri shortcut phrase title for playing a suggested podcast */
 "siri_shortcut_play_suggested_podcast_phrase" = "Play a suggested episode";
 
 /* Siri shortcut title for playing the next episode in the queue */
 "siri_shortcut_play_up_next_title" = "Playing next episode";
+
+/* Title of the Play Up Next App Intent shown in the Shortcuts app */
+"siri_shortcut_play_up_next_intent_title" = "Play Next Episode";
 
 /* Siri shortcut invocation phrase for playing the next episode in the queue. */
 "siri_shortcut_play_up_next_phrase" = "Up Next";
@@ -3257,7 +3263,7 @@
 "siri_shortcut_previous_chapter" = "Previous chapter";
 
 /* Siri shortcut title for resuming the current episode */
-"siri_shortcut_resume_title" = "Resuming Current Episode";
+"siri_shortcut_resume_title" = "Resume Current Episode";
 
 /* Siri shortcut invocation phrase for resuming the current episode */
 "siri_shortcut_resume_phrase" = "Resume";
@@ -6138,6 +6144,12 @@
 
 /* Generic error used when playback fails. */
 "player_error_short_playback_error" = "Playback failed, please try again";
+
+/* Error used when playback fails because the device has run out of storage. Streaming needs free disk space for the playback buffer. */
+"player_error_not_enough_storage" = "Your device is out of storage. Free up some space and try again.";
+
+/* Short version of the error used when playback fails because the device has run out of storage. */
+"player_error_short_not_enough_storage" = "Device storage is full";
 
 /* tv app home tab */
 "tv_tab_home" = "Home";

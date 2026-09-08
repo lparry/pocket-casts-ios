@@ -42,6 +42,258 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：启动睡眠计时器" } },
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：啟動睡眠計時器" } }
       }
+    },
+    "${applicationName}: Extend sleep timer by 5 minutes" : {
+      "comment" : "Phrase for running the extend sleep timer App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Amplia el temporitzador 5 minuts" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Schlummerfunktion um 5 Minuten verlängern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extend sleep timer by 5 minutes" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ampliar el temporizador en 5 minutos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extender temporizador de suspensión 5 minutos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Retarder la mise en veille de 5 minutes" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Prolonger la minuterie de veille de 5 minutes" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ritarda l'autospegnimento di 5 minuti" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}でスリープタイマーを5分延長" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Slaaptimer verlengen met 5 minuten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Estender o temporizador de soneca por 5 minutos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Отложить таймер спящего режима на 5 минут" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Förläng sovtimer med 5 minuter" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：将睡眠计时器延长 5 分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：將睡眠計時器延長 5 分鐘" } }
+      }
+    },
+    "${applicationName}: Extend Sleep Timer" : {
+      "comment" : "Phrase for running the extend sleep timer App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Amplia el temporitzador" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Schlummerfunktion verlängern" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extend Sleep Timer" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ampliar temporizador" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Extender temporizador de suspensión" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Retarder la mise en veille" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Prolonger la minuterie de veille" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Ritarda autospegnimento" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}でスリープタイマーを延長" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Slaaptimer verlengen" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Prolongar temporizador" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Отложить таймер сна" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Förläng Sovtimer" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延长睡眠计时器" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：延長睡眠計時器" } }
+      }
+    },
+    "${applicationName}: Pause" : {
+      "comment" : "A phrase for invoking the Pause Playback app shortcut.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Posa en pausa" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pause" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pause" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausar" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Pause" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Suspendre" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Metti in pausa" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で一時停止" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pauzeren" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausar" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Пауза" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Pausa" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：暂停" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：暫停" } }
+      }
+    },
+    "${applicationName}: Resume" : {
+      "comment" : "Phrase for running the resume playback App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reprèn" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Fortsetzen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Resume" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reanudar" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reanudar" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Reprendre" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Reprendre" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Riprendi" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で再開" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Hervatten" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Retomar" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Возобновить" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Återuppta" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：恢复" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：繼續播放" } }
+      }
+    },
+    "Continue playing in ${applicationName}" : {
+      "comment" : "Phrase for running the resume playback App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continua reproduint" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Weiterspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Continue playing in ${applicationName}" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuar reproduciendo" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuar reproduciendo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuer la lecture" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuer la lecture" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continua la riproduzione" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で再生を続ける" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: doorgaan met afspelen" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: continuar reprodução" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: продолжить воспроизведение" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: fortsätt spela" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：继续播放" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：繼續播放" } }
+      }
+    },
+    "${applicationName}: Up Next" : {
+      "comment" : "Phrase for running the Play Up Next App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Tot seguit" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Warteschlange" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Up Next" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: A continuación" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: A continuación" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : File d’attente" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Prochains épisodes" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Prossimo" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で次のエピソード" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Hierna" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Próximos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Следующие" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Nästa" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：接下来播放" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：接下來播放" } }
+      }
+    },
+    "Play the next episode in ${applicationName}" : {
+      "comment" : "Phrase for running the Play Up Next App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reprodueix l’episodi següent" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: die nächste Folge abspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play the next episode in ${applicationName}" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir el episodio siguiente" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir el episodio siguiente" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire l’épisode suivant" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire l’épisode suivant" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: riproduci l’episodio successivo" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で次のエピソードを再生" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: speel de volgende aflevering af" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproduzir o próximo episódio" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: воспроизвести следующий выпуск" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: spela nästa avsnitt" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放下一集" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放下一集" } }
+      }
+    },
+    "Play Suggested in ${applicationName}" : {
+      "comment" : "Phrase for running the Play Suggested App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reprodueix Suggerits" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Vorschlag abspielen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play Suggested in ${applicationName}" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir Sugeridos" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproducir Sugeridos" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire une suggestion" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : lire une suggestion" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: riproduci un suggerimento" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}でおすすめを再生" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: speel een suggestie af" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: reproduzir sugestão" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: воспроизвести рекомендацию" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: spela förslag" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放推荐内容" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在 ${applicationName} 中播放推薦內容" } }
+      }
+    },
+    "${applicationName}: Play a suggested episode" : {
+      "comment" : "Phrase for running the Play Suggested App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reprodueix un capítol recomanat" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Vorgeschlagene Folge wiedergeben" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Play a suggested episode" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reproducir un episodio recomendado" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reproducir un episodio sugerido" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Lire un épisode suggéré" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Lire un épisode suggéré" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Riproduci un episodio suggerito" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で提案されたエピソードを再生" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Een voorgestelde aflevering afspelen" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Reproduzir um episódio sugerido" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Воспроизвести рекомендуемый выпуск" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Spela ett föreslaget avsnitt" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：播放推荐剧集" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：播放推薦的劇集" } }
+      }
+    },
+    "${applicationName}: Next chapter" : {
+      "comment" : "Phrase for running the Next Chapter App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítol següent" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Nächstes Kapitel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Next chapter" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo siguiente" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Próximo capítulo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre suivant" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre suivant" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capitolo successivo" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で次のチャプター" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Volgend hoofdstuk" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Próximo capítulo" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Следующая глава" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Nästa kapitel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：下一章" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：下一章" } }
+      }
+    },
+    "${applicationName}: Previous chapter" : {
+      "comment" : "Phrase for running the Previous Chapter App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítol anterior" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Vorheriges Kapitel" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Previous chapter" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo anterior" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo anterior" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre précédent" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Chapitre précédent" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capitolo precedente" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で前のチャプター" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Eerder hoofdstuk" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Capítulo anterior" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Предыдущая глава" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Föregående kapitel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：上一章" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：上一章" } }
+      }
+    },
+    "${applicationName}: Mark as Played" : {
+      "comment" : "Phrase for running the Mark as Played App Shortcut. ${applicationName} is the name of the app.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ca" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marca com a reproduït" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Als gehört markieren" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Mark as Played" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marcar como reproducido" } },
+        "es-MX" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marcar como reproducido" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Marquer comme lu" } },
+        "fr-CA" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName} : Marquer comme lu" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Contrassegna come Riprodotto" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}で再生済みとしてマーク" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Markeren als afgespeeld" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Marcar como reproduzido" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Отметить как прослушанный" } },
+        "sv" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}: Markera som Uppspelat" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：标记为已播放" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "${applicationName}：標記為已播放" } }
+      }
     }
   },
   "version" : "1.0"

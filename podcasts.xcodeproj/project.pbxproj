@@ -461,6 +461,7 @@
 		9AF646932E5DEB1A00627836 /* PlaylistDetailViewController+MultiSelect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF646922E5DEB1300627836 /* PlaylistDetailViewController+MultiSelect.swift */; };
 		9AF646952E5E081600627836 /* PlaylistDetailViewController+TableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF646942E5E081400627836 /* PlaylistDetailViewController+TableView.swift */; };
 		9AF646972E5E0BB800627836 /* PlaylistDetailViewController+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF646962E5E0BB700627836 /* PlaylistDetailViewController+Search.swift */; };
+		A100000030A1000000000001 /* SleepTimerSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000030A1000000000002 /* SleepTimerSettingsViewController.swift */; };
 		A13200320100000000000001 /* SetSleepTimerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13200320100000000000003 /* SetSleepTimerIntent.swift */; };
 		A13200320100000000000002 /* MigratedSleepTimerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13200320100000000000004 /* MigratedSleepTimerIntent.swift */; };
 		A13200320100000000000005 /* PocketCastsAppShortcutsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13200320100000000000006 /* PocketCastsAppShortcutsProvider.swift */; };
@@ -2008,6 +2009,7 @@
 		9AF646922E5DEB1300627836 /* PlaylistDetailViewController+MultiSelect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaylistDetailViewController+MultiSelect.swift"; sourceTree = "<group>"; };
 		9AF646942E5E081400627836 /* PlaylistDetailViewController+TableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaylistDetailViewController+TableView.swift"; sourceTree = "<group>"; };
 		9AF646962E5E0BB700627836 /* PlaylistDetailViewController+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaylistDetailViewController+Search.swift"; sourceTree = "<group>"; };
+		A100000030A1000000000002 /* SleepTimerSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTimerSettingsViewController.swift; sourceTree = "<group>"; };
 		A13200320100000000000003 /* SetSleepTimerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetSleepTimerIntent.swift; sourceTree = "<group>"; };
 		A13200320100000000000004 /* MigratedSleepTimerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratedSleepTimerIntent.swift; sourceTree = "<group>"; };
 		A13200320100000000000006 /* PocketCastsAppShortcutsProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketCastsAppShortcutsProvider.swift; sourceTree = "<group>"; };
@@ -4201,6 +4203,7 @@
 				BD874EEC1C9A373C00F5B2A5 /* SettingsViewController.swift */,
 				BD874EED1C9A373C00F5B2A5 /* SettingsViewController.xib */,
 				BD874EF51C9A428A00F5B2A5 /* GeneralSettingsViewController.swift */,
+				A100000030A1000000000002 /* SleepTimerSettingsViewController.swift */,
 				BD874EF61C9A428A00F5B2A5 /* GeneralSettingsViewController.xib */,
 				BD874EF91C9A637200F5B2A5 /* NotificationsViewController.swift */,
 				BD874EFA1C9A637200F5B2A5 /* NotificationsViewController.xib */,
@@ -7287,6 +7290,7 @@
 				4635390E26F3C42C00BA9D35 /* MessageSupportViewModel.swift in Sources */,
 				9AF646842E58B5CD00627836 /* PlaylistDetailViewController+EmptyState.swift in Sources */,
 				BD874EF71C9A428B00F5B2A5 /* GeneralSettingsViewController.swift in Sources */,
+				A100000030A1000000000001 /* SleepTimerSettingsViewController.swift in Sources */,
 				BD98C54B1BA802AA00E85D3B /* DiscoverDisclosureCell.swift in Sources */,
 				4065143E2485EB8E00B7E789 /* LastSupporterPodcastCell.swift in Sources */,
 				BDE5B8D81E6401F80039B409 /* EpisodeFileSizeUpdater.swift in Sources */,

@@ -6,7 +6,7 @@ import PocketCastsUtils
 import UIKit
 import Combine
 
-class PlaybackManager: ServerPlaybackDelegate {
+class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
     static let shared = PlaybackManager()
 
     private let updatesPerSave = 30 // save the users progress every 30 seconds
@@ -21,11 +21,10 @@ class PlaybackManager: ServerPlaybackDelegate {
 
     var sleepTimeRemaining = -1 as TimeInterval
 
-    var numberOfEpisodesToSleepAfter = 0 {
+    private(set) var numberOfEpisodesToSleepAfter = 0 {
         didSet {
             if numberOfEpisodesToSleepAfter > 0 {
                 sleepTimeRemaining = -1
-                sleepTimerManager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true)
                 FileLog.shared.addMessage("Sleep Timer: starting with \(numberOfEpisodesToSleepAfter) episodes")
                 endSleepTimerLiveActivity()
             }
@@ -344,7 +343,7 @@ class PlaybackManager: ServerPlaybackDelegate {
 
             self.updateIdleTimer()
 
-            self.sleepTimerManager.restartSleepTimerIfNeeded()
+            self.sleepTimerManager.restartSleepTimerIfNeeded(userInitiated: userInitiated)
             self.syncSleepTimerLiveActivity(isPaused: false)
         })
     }
@@ -759,13 +758,15 @@ class PlaybackManager: ServerPlaybackDelegate {
         DataManager.shared.saveEpisode(playbackError: nil, episode: nextEpisode)
         activeError = nil
 
+        // Decrement the running timer before play can activate a new automatic timer.
+        numberOfEpisodesToSleepAfter = max(0, numberOfEpisodesToSleepAfter - 1)
+
         if autoPlay {
             play(userInitiated: false)
         } else {
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.upNextQueueChanged)
         }
 
-        numberOfEpisodesToSleepAfter -= 1
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackTrackChanged)
     }
 
@@ -1934,10 +1935,17 @@ class PlaybackManager: ServerPlaybackDelegate {
     func setSleepTimerInterval(_ stopIn: TimeInterval) {
         FileLog.shared.addMessage("Sleep Timer: starting with \(stopIn)")
         sleepTimerManager.recordSleepTimerDuration(duration: stopIn, onEpisodeEnd: nil)
+        numberOfEpisodesToSleepAfter = 0
         sleepTimeRemaining = stopIn
         startSleepTimerLiveActivity(duration: stopIn)
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.sleepTimerChanged)
         Analytics.track(.playerSleepTimerEnabled, properties: ["time": Int(stopIn)])
+    }
+
+    func setSleepTimerEpisodeCount(_ count: Int) {
+        guard count > 0 else { return }
+        sleepTimerManager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: count)
+        numberOfEpisodesToSleepAfter = count
     }
 
     func extendSleepTimer(by duration: TimeInterval, source: AnalyticsSource) {

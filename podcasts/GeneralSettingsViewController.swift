@@ -60,6 +60,7 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        settingsTable.reloadData()
 
         if AnnouncementFlow.current == .autoPlay {
             settingsTable.scrollToRow(at: IndexPath(row: 0, section: settingsTable.numberOfSections - 1), at: .bottom, animated: true)
@@ -304,14 +305,9 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
 
             return cell
         case .autoRestartSleepTimer:
-            let cell = tableView.dequeueReusableCell(withIdentifier: switchCellId, for: indexPath) as! SwitchCell
-
-            cell.cellLabel.text = L10n.autoRestartSleepTimer
-            cell.cellSwitch.isOn = Settings.autoRestartSleepTimer
-
-            cell.cellSwitch.removeTarget(self, action: nil, for: .valueChanged)
-            cell.cellSwitch.addTarget(self, action: #selector(autoRestartSleepTimerToggled(_:)), for: .valueChanged)
-
+            let cell = tableView.dequeueReusableCell(withIdentifier: disclosureCellId, for: indexPath) as! DisclosureCell
+            cell.cellLabel.text = L10n.sleepTimerAutomaticTitle
+            cell.cellSecondaryLabel.text = Settings.automaticSleepTimerMode.title
             return cell
         case .shakeToRestartSleepTimer:
             let cell = tableView.dequeueReusableCell(withIdentifier: switchCellId, for: indexPath) as! SwitchCell
@@ -360,7 +356,9 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
         tableView.deselectRow(at: indexPath, animated: true)
 
         let row = tableData[indexPath.section][indexPath.row]
-        if row == .defaultRowAction {
+        if row == .autoRestartSleepTimer {
+            navigationController?.pushViewController(SleepTimerSettingsViewController(), animated: true)
+        } else if row == .defaultRowAction {
             let currentAction = Settings.primaryRowAction
 
             let options = OptionsPicker(title: L10n.settingsGeneralRowAction)
@@ -499,7 +497,7 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
         case .audioOnly:
             return L10n.settingsGeneralAudioOnlySubtitle
         case .autoRestartSleepTimer:
-            return L10n.autoRestartSleepTimerDescription
+            return Settings.automaticSleepTimerMode.explanation
         case .shakeToRestartSleepTimer:
             return L10n.shakeToRestartSleepTimerDescription
         case .voiceBoostN:
@@ -620,12 +618,6 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
         ServerSettings.syncSettings()
 
         Settings.trackValueToggled(.settingsGeneralAudioOnlyToggled, enabled: sender.isOn)
-    }
-
-    @objc private func autoRestartSleepTimerToggled(_ sender: UISwitch) {
-        Settings.autoRestartSleepTimer = sender.isOn
-
-        Settings.trackValueToggled(.settingsGeneralAutoSleepTimerRestartToggled, enabled: sender.isOn)
     }
 
     @objc private func shakeToRestartSleepTimerToggled(_ sender: UISwitch) {

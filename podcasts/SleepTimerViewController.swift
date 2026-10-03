@@ -310,7 +310,7 @@ class SleepTimerViewController: SimpleNotificationsViewController {
     @IBAction func settingsTapped(_ sender: Any) {
         Analytics.track(.playerSleepTimerSettingsTapped)
 #if !APPCLIP
-        NavigationManager.shared.navigateTo(NavigationManager.settingsGeneralKey, data: [NavigationManager.settingsGeneralRowKey: GeneralSettingsViewController.TableRow.autoRestartSleepTimer])
+        NavigationManager.shared.navigateTo(NavigationManager.settingsSleepTimerKey)
 #endif
     }
 
@@ -336,7 +336,7 @@ class SleepTimerViewController: SimpleNotificationsViewController {
 
     @IBAction func endOfEpisodeTapped(_ sender: Any) {
         let numberOfEpisodes = Settings.sleepTimerNumberOfEpisodes
-        PlaybackManager.shared.numberOfEpisodesToSleepAfter = numberOfEpisodes
+        PlaybackManager.shared.setSleepTimerEpisodeCount(numberOfEpisodes)
         Analytics.track(.playerSleepTimerEnabled, properties: ["time": "end_of_episode", "number_of_episodes": numberOfEpisodes])
         dismiss(animated: true, completion: nil)
     }
@@ -354,7 +354,7 @@ class SleepTimerViewController: SimpleNotificationsViewController {
 
     @IBAction func endOfEpisodeActiveTapped(_ sender: Any) {
         let numberOfEpisodes = Settings.sleepTimerNumberOfEpisodes
-        PlaybackManager.shared.numberOfEpisodesToSleepAfter = numberOfEpisodes
+        PlaybackManager.shared.setSleepTimerEpisodeCount(numberOfEpisodes)
         updateDisplay()
         Analytics.track(.playerSleepTimerExtended, source: AnalyticsSource.player, properties: ["amount": "end_of_episode", "number_of_episodes": numberOfEpisodes])
     }

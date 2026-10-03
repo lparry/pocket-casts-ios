@@ -39,6 +39,7 @@ protocol NavigationProtocol: AnyObject {
     func showPromotionFinishedAcknowledge()
     func showHeadphoneSettings()
     func showGeneralSettings(row: GeneralSettingsViewController.TableRow?)
+    func showSleepTimerSettings()
     func showRedeemGuestPass(url: URL)
 
     func showSignUp()

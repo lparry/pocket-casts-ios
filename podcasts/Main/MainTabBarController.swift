@@ -710,6 +710,14 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     }
 
     func showGeneralSettings(row: GeneralSettingsViewController.TableRow?) {
+        showGeneralSettings(row: row, showSleepTimerSettings: false)
+    }
+
+    func showSleepTimerSettings() {
+        showGeneralSettings(row: .autoRestartSleepTimer, showSleepTimerSettings: true)
+    }
+
+    private func showGeneralSettings(row: GeneralSettingsViewController.TableRow?, showSleepTimerSettings: Bool) {
         let state = NavigationManager.shared.miniPlayer?.playerOpenState
 
         // Dismiss any presented views if the player is not already open/dismissing since it will dismiss itself
@@ -723,7 +731,10 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
             navController.pushViewController(SettingsViewController(), animated: false)
             let generalSettingsController = GeneralSettingsViewController()
             generalSettingsController.scrollToRow = row
-            navController.pushViewController(generalSettingsController, animated: true)
+            navController.pushViewController(generalSettingsController, animated: !showSleepTimerSettings)
+            if showSleepTimerSettings {
+                navController.pushViewController(SleepTimerSettingsViewController(), animated: true)
+            }
         }
     }
 

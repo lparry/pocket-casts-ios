@@ -412,10 +412,10 @@ class Settings: NSObject {
 
     static var sleepTimerNumberOfEpisodes: Int {
         get {
-            UserDefaults.standard.object(forKey: "sleep_timer_custom_number_of_episodes") as? Int ?? 1
+            UserDefaults.standard.object(forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes) as? Int ?? 1
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: "sleep_timer_custom_number_of_episodes")
+            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes)
         }
     }
 
@@ -1012,13 +1012,14 @@ class Settings: NSObject {
 
     // MARK: - Sleep Timer
 
-    static var autoRestartSleepTimer: Bool {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.autoRestartSleepTimer)
-        }
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.autoRestartSleepTimer) as? Bool ?? true
-        }
+    static var automaticSleepTimerMode: SleepTimerManager.AutomaticMode {
+        get { SleepTimerManager.Preferences().mode }
+        set { SleepTimerManager.Preferences().mode = newValue }
+    }
+
+    static var sleepTimerTimeWindow: SleepTimerManager.TimeWindow {
+        get { SleepTimerManager.Preferences().timeWindow }
+        set { SleepTimerManager.Preferences().timeWindow = newValue }
     }
 
     static var shakeToRestartSleepTimer: Bool {

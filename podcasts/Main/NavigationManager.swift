@@ -76,6 +76,7 @@ class NavigationManager {
     static let onboardingFlow = "onboardingFlow"
 
     static let settingsGeneralKey = "generalSettingsPage"
+    static let settingsSleepTimerKey = "sleepTimerSettingsPage"
     static let settingsGeneralRowKey = "generalSettingsRow"
 
     static let upNextPageKey = "upNextPage"
@@ -244,6 +245,8 @@ class NavigationManager {
             mainController?.showOnboardingFlow(flow: flow, source: source)
         } else if place == NavigationManager.settingsGeneralKey {
             mainController?.showGeneralSettings(row: data?[NavigationManager.settingsGeneralRowKey] as? GeneralSettingsViewController.TableRow)
+        } else if place == NavigationManager.settingsSleepTimerKey {
+            mainController?.showSleepTimerSettings()
         } else if place == NavigationManager.upNextPageKey {
             mainController?.navigateToUpNext(true)
         } else if place == NavigationManager.signUpPageKey {

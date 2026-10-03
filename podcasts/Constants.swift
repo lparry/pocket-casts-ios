@@ -175,6 +175,7 @@ struct Constants {
         static let searchHistoryEntries = "SearchHistoryEntries"
 
         static let sleepTimerFinishedDate = "sleepTimerFinishedDate"
+        static let sleepTimerFinishedEpisodeUuid = "sleepTimerFinishedEpisodeUuid"
         static let sleepTimerSetting = "sleepTimerSetting"
 
         static let isLockScreenScrubbingDisabled = "IsLockScreenScrubbingDisabled"

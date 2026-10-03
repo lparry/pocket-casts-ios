@@ -172,29 +172,29 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
         queue.recordUpNextUserInteraction()
     }
 
-    func load(episode: BaseEpisode, autoPlay: Bool, overrideUpNext: Bool, saveCurrentEpisode: Bool = true, completion: (() -> Void)? = nil) {
+    func load(episode: BaseEpisode, autoPlay: Bool, overrideUpNext: Bool, saveCurrentEpisode: Bool = true, userInitiated: Bool = true, completion: (() -> Void)? = nil) {
         FileLog.shared.addMessage("Loading \(episode.displayableTitle()) with UUID \(episode.uuid) autoPlay \(autoPlay) overrideUpNext: \(overrideUpNext)")
 
         // if the user has built an Up Next list, preserve that but make this the currently playing episode
         if !overrideUpNext, queue.upNextCount() > 0, let currEpisode = currentEpisode, currEpisode.uuid != episode.uuid {
-            switchTo(episodeToPlay: episode, autoPlay: autoPlay, completion: completion)
+            switchTo(episodeToPlay: episode, autoPlay: autoPlay, userInitiated: userInitiated, completion: completion)
 
             return
         }
 
-        performLoad(episode: episode, autoPlay: autoPlay, overrideUpNext: overrideUpNext, saveCurrentEpisode: saveCurrentEpisode, completion: completion)
+        performLoad(episode: episode, autoPlay: autoPlay, overrideUpNext: overrideUpNext, saveCurrentEpisode: saveCurrentEpisode, userInitiated: userInitiated, completion: completion)
     }
 
-    private func switchTo(episodeToPlay: BaseEpisode, autoPlay: Bool, completion: (() -> Void)? = nil) {
+    private func switchTo(episodeToPlay: BaseEpisode, autoPlay: Bool, userInitiated: Bool, completion: (() -> Void)? = nil) {
         cancelUpdateTimer()
 
-        performLoad(episode: episodeToPlay, autoPlay: autoPlay, overrideUpNext: false, saveCurrentEpisode: false, completion: completion)
+        performLoad(episode: episodeToPlay, autoPlay: autoPlay, overrideUpNext: false, saveCurrentEpisode: false, userInitiated: userInitiated, completion: completion)
 
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackTrackChanged)
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.upNextQueueChanged)
     }
 
-    private func performLoad(episode: BaseEpisode, autoPlay: Bool, overrideUpNext: Bool, saveCurrentEpisode: Bool, completion: (() -> Void)?) {
+    private func performLoad(episode: BaseEpisode, autoPlay: Bool, overrideUpNext: Bool, saveCurrentEpisode: Bool, userInitiated: Bool, completion: (() -> Void)?) {
         let episodeIsChanging = episode.uuid != currentEpisode?.uuid
 
         // A new episode shouldn't inherit the previous one's "watch downloaded video" choice.
@@ -242,7 +242,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
 
         if autoPlay {
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.playbackStarting)
-            play(completion: completion)
+            play(completion: completion, userInitiated: userInitiated)
 
             checkIfStreamBufferRequired(episode: episode, effects: effects)
         } else if episodeIsChanging {
@@ -343,7 +343,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
 
             self.updateIdleTimer()
 
-            self.sleepTimerManager.restartSleepTimerIfNeeded(userInitiated: userInitiated)
+            self.sleepTimerManager.restartSleepTimerIfNeeded(userInitiated: userInitiated, episodeUuid: currEpisode.uuid)
             self.syncSleepTimerLiveActivity(isPaused: false)
         })
     }
@@ -557,6 +557,9 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
         }
 
         let currentTime = playingEpisode.playedUpTo
+        if time >= 0, time < currentTime {
+            sleepTimerManager.recordRewind(episodeUuid: playingEpisode.uuid)
+        }
         seekingTo = time
         FileLog.shared.addMessage("seek to \(time) startPlaybackAfterSeek \(startPlaybackAfterSeek)")
 
@@ -913,7 +916,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
         guard let episode = currentEpisode else { return }
         let wasPlaying = isPlaying
         recordPlaybackPosition(sendToServerImmediately: false, fireNotifications: false)
-        load(episode: episode, autoPlay: wasPlaying, overrideUpNext: false, saveCurrentEpisode: false)
+        load(episode: episode, autoPlay: wasPlaying, overrideUpNext: false, saveCurrentEpisode: false, userInitiated: false)
     }
 
     /// Called by the player when it detects video tracks in the stream it is playing.
@@ -1101,7 +1104,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
         guard let episode = currentEpisode else { return }
 
         if playerSwitchRequired() {
-            load(episode: episode, autoPlay: isPlaying, overrideUpNext: false)
+            load(episode: episode, autoPlay: isPlaying, overrideUpNext: false, userInitiated: false)
         }
 
         player?.effectsDidChange()
@@ -1308,7 +1311,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
 
             fallbackToPlayer = DefaultPlayer.self
 
-            load(episode: episode, autoPlay: true, overrideUpNext: false) { [weak self] in
+            load(episode: episode, autoPlay: true, overrideUpNext: false, userInitiated: false) { [weak self] in
                 self?.fallbackToPlayer = nil
             }
             return
@@ -1371,7 +1374,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
 
     func playerDidFinishPlayingEpisode() {
         if numberOfEpisodesToSleepAfter == 1 {
-            pauseAndRecordSleepTimerFinished()
+            pauseAndRecordSleepTimerFinished(atEndOfEpisode: true)
             cancelSleepTimer()
             return
         }
@@ -1753,7 +1756,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
             let timeRemaining = episodeDuration - currentTime()
             if episodeDuration > 0, episodeDuration > skipLast, timeRemaining < skipLast {
                 if numberOfEpisodesToSleepAfter == 1 {
-                    pause()
+                    pauseAndRecordSleepTimerFinished(atEndOfEpisode: true)
                     cancelSleepTimer()
                 } else {
                     FileLog.shared.addMessage("Skipping last \(timeRemaining) seconds of episode because podcast has skip last of \(skipLast) set.")
@@ -1796,8 +1799,8 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
         }
     }
 
-    private func pauseAndRecordSleepTimerFinished() {
-        sleepTimerManager.recordSleepTimerFinished()
+    private func pauseAndRecordSleepTimerFinished(atEndOfEpisode: Bool = false) {
+        sleepTimerManager.recordSleepTimerFinished(episodeUuid: atEndOfEpisode ? currentEpisode?.uuid : nil)
         endSleepTimerLiveActivity()
         pause()
     }
@@ -2317,7 +2320,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
                 // When flag is disabled: always autoplay (original behavior)
                 autoPlay = true
             }
-            load(episode: currEpisode, autoPlay: autoPlay, overrideUpNext: false)
+            load(episode: currEpisode, autoPlay: autoPlay, overrideUpNext: false, userInitiated: false)
         } else if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
             player?.routeDidChange(shouldPause: true)
         } else if reason == AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue || reason == AVAudioSession.RouteChangeReason.override.rawValue || reason == AVAudioSession.RouteChangeReason.categoryChange.rawValue {
@@ -2404,7 +2407,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
         pause()
 
         AnalyticsPlaybackHelper.shared.currentSource = .chromecast
-        load(episode: episode, autoPlay: true, overrideUpNext: false)
+        load(episode: episode, autoPlay: true, overrideUpNext: false, userInitiated: false)
     }
 
     func remoteDeviceWillDisconnect() {
@@ -2433,7 +2436,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
             // if we get here then we're either not playing anything, or we're meant to be playing this episode anyway, so connect back up with it
             if let episodePlaying = DataManager.shared.findBaseEpisode(uuid: episodeUuid) {
                 let shouldPlay = GoogleCastManager.shared.playing()
-                load(episode: episodePlaying, autoPlay: shouldPlay, overrideUpNext: false)
+                load(episode: episodePlaying, autoPlay: shouldPlay, overrideUpNext: false, userInitiated: false)
             }
         #endif
     }
@@ -2486,7 +2489,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
                 return
             }
 
-            load(episode: refreshedEpisode, autoPlay: currentlyPlaying, overrideUpNext: false, saveCurrentEpisode: false)
+            load(episode: refreshedEpisode, autoPlay: currentlyPlaying, overrideUpNext: false, saveCurrentEpisode: false, userInitiated: false)
             if refreshedEpisode.videoPodcast() {
                 NotificationCenter.postOnMainThread(notification: Constants.Notifications.videoPlaybackEngineSwitched)
             }
@@ -2620,7 +2623,7 @@ class PlaybackManager: ServerPlaybackDelegate, SleepTimerPlayback {
 
                 FileLog.shared.addMessage("PlaybackManager: Episode\(wasUpdated ? " " : " not") updated, trying to play again.")
 
-                load(episode: updatedEpisode, autoPlay: true, overrideUpNext: false)
+                load(episode: updatedEpisode, autoPlay: true, overrideUpNext: false, userInitiated: false)
             }
         }
         return true

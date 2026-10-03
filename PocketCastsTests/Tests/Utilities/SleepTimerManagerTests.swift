@@ -150,6 +150,66 @@ final class SleepTimerManagerTests: XCTestCase {
         XCTAssertEqual(preferences.lastSetting?.numberOfEpisodes, 3)
     }
 
+    func testFinishedEpisodeDoesNotConsumeRestartedEpisodeCount() {
+        for mode in [SleepTimerManager.AutomaticMode.afterTimerEnds, .timeWindow] {
+            for count in [1, 3] {
+                playback.active = false
+                playback.startedEpisodeCounts = []
+                preferences.mode = mode
+                manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: count)
+                manager.recordSleepTimerFinished(episodeUuid: "finished")
+
+                manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
+                manager.restartSleepTimerIfNeeded(userInitiated: false, episodeUuid: "finished")
+                XCTAssertTrue(playback.startedEpisodeCounts.isEmpty)
+
+                manager.restartSleepTimerIfNeeded(userInitiated: false, episodeUuid: "next")
+                XCTAssertEqual(playback.startedEpisodeCounts, [count])
+            }
+        }
+    }
+
+    func testFinishedEpisodeRemainsDeferredAfterRelaunch() {
+        manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 1)
+        manager.recordSleepTimerFinished(episodeUuid: "finished")
+        let reloaded = SleepTimerManager(preferences: .init(userDefaults: defaults),
+                                        playback: { [unowned self] in self.playback },
+                                        now: { [unowned self] in self.currentDate },
+                                        calendar: { [unowned self] in self.calendar })
+
+        reloaded.restartSleepTimerIfNeeded(episodeUuid: "finished")
+        XCTAssertTrue(playback.startedEpisodeCounts.isEmpty)
+        reloaded.restartSleepTimerIfNeeded(userInitiated: false, episodeUuid: "next")
+        XCTAssertEqual(playback.startedEpisodeCounts, [1])
+    }
+
+    func testRewindingFinishedEpisodeAllowsTimerOnNextPlay() {
+        manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 1)
+        manager.recordSleepTimerFinished(episodeUuid: "finished")
+        manager.recordRewind(episodeUuid: "unrelated")
+        manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
+        XCTAssertTrue(playback.startedEpisodeCounts.isEmpty)
+
+        manager.recordRewind(episodeUuid: "finished")
+        manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
+        XCTAssertEqual(playback.startedEpisodeCounts, [1])
+    }
+
+    func testExplicitlyChoosingNewTimerClearsFinishedEpisodeDeferral() {
+        manager.recordSleepTimerFinished(episodeUuid: "finished")
+        manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 2)
+        manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
+        XCTAssertEqual(playback.startedEpisodeCounts, [2])
+    }
+
+    func testDurationTimerExpiryDoesNotDeferSameEpisode() {
+        manager.recordSleepTimerFinished(episodeUuid: "finished")
+        manager.recordSleepTimerDuration(duration: 30.minutes, onEpisodeEnd: nil)
+        manager.recordSleepTimerFinished()
+        manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
+        XCTAssertEqual(playback.startedDurations, [30.minutes])
+    }
+
     func testLegacyEpisodeTimerRestoresCountWithoutDurationNotification() {
         let legacyData = Data(#"{"sleepOnEpisodeEnd":true}"#.utf8)
         defaults.set(legacyData, forKey: Constants.UserDefaults.sleepTimerSetting)

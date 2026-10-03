@@ -54,14 +54,22 @@ class SleepTimerManager {
         }
     }
 
-    func recordSleepTimerFinished() {
+    func recordSleepTimerFinished(episodeUuid: String? = nil) {
         preferences.finishedDate = now()
+        preferences.finishedEpisodeUuid = episodeUuid
         FileLog.shared.addMessage("Sleep Timer: finished (\(preferences.finishedDate?.description ?? ""))")
+    }
+
+    func recordRewind(episodeUuid: String) {
+        if preferences.finishedEpisodeUuid == episodeUuid {
+            preferences.finishedEpisodeUuid = nil
+        }
     }
 
     func recordSleepTimerDuration(duration: TimeInterval?, onEpisodeEnd: Bool?, numberOfEpisodes: Int? = nil) {
         let setting = SleepTimerSetting(duration: duration, sleepOnEpisodeEnd: onEpisodeEnd, numberOfEpisodes: numberOfEpisodes)
         preferences.lastSetting = setting
+        preferences.finishedEpisodeUuid = nil
         cancelledForCurrentSession = false
     }
 
@@ -74,7 +82,7 @@ class SleepTimerManager {
         cancelledForCurrentSession = true
     }
 
-    func restartSleepTimerIfNeeded(userInitiated: Bool = true) {
+    func restartSleepTimerIfNeeded(userInitiated: Bool = true, episodeUuid: String? = nil) {
         if userInitiated {
             cancelledForCurrentSession = false
         }
@@ -92,6 +100,12 @@ class SleepTimerManager {
             guard elapsed >= 0, elapsed <= restartSleepTimerIfPlayingAgainWithin else { return }
         case .timeWindow:
             guard preferences.timeWindow.contains(currentDate, calendar: calendar()) else { return }
+        }
+
+        // Leave the finished episode available to rewind. Re-arming its episode timer here
+        // would pause at the same ending again before the queue can advance.
+        if setting.sleepOnEpisodeEnd == true, let episodeUuid, episodeUuid == preferences.finishedEpisodeUuid {
+            return
         }
 
         activate(setting: setting, reason: preferences.mode == .timeWindow ? "time_window" : "recent_timer")
@@ -220,6 +234,11 @@ class SleepTimerManager {
         var finishedDate: Date? {
             get { userDefaults.object(forKey: Constants.UserDefaults.sleepTimerFinishedDate) as? Date }
             nonmutating set { userDefaults.set(newValue, forKey: Constants.UserDefaults.sleepTimerFinishedDate) }
+        }
+
+        var finishedEpisodeUuid: String? {
+            get { userDefaults.string(forKey: Constants.UserDefaults.sleepTimerFinishedEpisodeUuid) }
+            nonmutating set { userDefaults.set(newValue, forKey: Constants.UserDefaults.sleepTimerFinishedEpisodeUuid) }
         }
 
         var legacyEpisodeCount: Int {

@@ -6801,3 +6801,6 @@
 
 /* Status of a downloaded episode whose podcast has Scan for Ads turned off */
 "ad_skipping_status_off_for_podcast" = "Off for this podcast";
+
+/* Title of the screen, and the Profile and settings rows that open it, listing downloaded episodes and whether their ads have been found */
+"ad_scanning_title" = "Ad Scanning";

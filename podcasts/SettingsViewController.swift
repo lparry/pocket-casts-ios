@@ -221,7 +221,10 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
             let foldersHistoryViewController = FolderHistoryViewController()
             navigationController?.pushViewController(foldersHistoryViewController, animated: true)
         case .adSkipping:
-            let hostingController = UIHostingController(rootView: AdSkippingSettingsView().setupDefaultEnvironment())
+            let settingsView = AdSkippingSettingsView { [weak self] in
+                self?.navigationController?.pushViewController(AdScanningView.makeViewController(), animated: true)
+            }
+            let hostingController = UIHostingController(rootView: settingsView.setupDefaultEnvironment())
             hostingController.title = L10n.adSkippingTitle
             navigationController?.pushViewController(hostingController, animated: true)
         }

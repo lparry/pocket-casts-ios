@@ -8,8 +8,8 @@ struct AdClassificationContext {
 
 /// Finds the ads in a timestamped transcript.
 ///
-/// `FoundationModelsAdClassifier` runs on device and is the default. `OpenRouterAdClassifier`
-/// is used instead when the listener has saved an OpenRouter key.
+/// `OpenRouterAdClassifier` finds the ads, with the listener's own key. `FoundationModelsAdClassifier` runs on
+/// device, and is only a backup for when an OpenRouter request fails.
 protocol AdClassifier {
     /// Stored with each analysis so results from different classifiers can be told apart
     var identifier: String { get }

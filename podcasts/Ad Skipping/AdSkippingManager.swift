@@ -12,9 +12,9 @@ import UIKit
 /// Every downloaded episode is scanned once for each file it's downloaded as: when a download
 /// finishes, and as a backfill whenever the app launches or comes to the foreground. A background
 /// processing task carries on with the queue while the device is charging. The local file is
-/// transcribed on device and the timestamped transcript goes to an `AdClassifier`: OpenRouter when
-/// the listener has saved a key, otherwise Apple's on-device model, which is also the fallback if
-/// OpenRouter fails. The resulting spans are in the timeline of that download, so they're only used
+/// transcribed on device and the timestamped transcript goes to an `AdClassifier`: OpenRouter, with
+/// the listener's own key, falling back to Apple's on-device model if an OpenRouter request fails.
+/// Nothing is scanned without a key. The resulting spans are in the timeline of that download, so they're only used
 /// while it's still the file on disk.
 ///
 /// Processing runs on the main actor, but playback reads spans from the progress tick, so that state is behind a lock.
@@ -150,11 +150,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         classifiersProvider(openRouterApiKey, openRouterModel)
     }
 
+    /// OpenRouter finds the ads. The on-device model is too unreliable to use on its own, so it's only a backup for
+    /// when an OpenRouter request fails, and nothing is scanned without a key.
     private static func defaultClassifiers(openRouterApiKey: String?, openRouterModel: String) -> [AdClassifier] {
-        var classifiers: [AdClassifier] = []
-        if let openRouterApiKey {
-            classifiers.append(OpenRouterAdClassifier(apiKey: openRouterApiKey, model: openRouterModel))
-        }
+        guard let openRouterApiKey else { return [] }
+
+        var classifiers: [AdClassifier] = [OpenRouterAdClassifier(apiKey: openRouterApiKey, model: openRouterModel)]
         if #available(iOS 26, *), FoundationModelsAdClassifier.isAvailable {
             classifiers.append(FoundationModelsAdClassifier())
         }
@@ -343,7 +344,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     /// Episodes that failed since launch are left alone unless `includingFailed`, so a permanent failure isn't retried on every foreground.
     @MainActor
     func scanMissing(includingFailed: Bool = false) {
-        guard FeatureFlag.autoAdSkip.enabled else { return }
+        // Without a classifier every scan would fail, so wait for a key
+        guard FeatureFlag.autoAdSkip.enabled, !classifiers.isEmpty else { return }
 
         let downloaded = downloadedEpisodes()
         transcriptStore.removeAll(except: Set(downloaded.map(\.uuid)))

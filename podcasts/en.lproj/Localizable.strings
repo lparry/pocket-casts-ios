@@ -6722,7 +6722,7 @@
 "ad_skipping_api_key_remove" = "Remove Key";
 
 /* Explains where the OpenRouter key is kept, what's sent to OpenRouter, and what the model field is */
-"ad_skipping_api_key_footer" = "With a key, transcripts are sent to this OpenRouter model to find the ads, instead of finding them on device. The key stays in this device's keychain.";
+"ad_skipping_api_key_footer" = "Transcripts are sent to this OpenRouter model to find the ads. The key stays in this device's keychain.";
 
 /* Label for the field holding the OpenRouter model name, like anthropic/claude-sonnet-5.5 */
 "ad_skipping_model" = "Model";
@@ -6731,7 +6731,7 @@
 "ad_skipping_classifier_active" = "Finding ads with %1$@";
 
 /* Explains how ad finding works and the on-device fallback */
-"ad_skipping_classifier_footer" = "Downloaded episodes are transcribed on device. Ads are found on device with Apple Intelligence, or with OpenRouter when a key is saved, falling back to on device if OpenRouter fails.";
+"ad_skipping_classifier_footer" = "Downloaded episodes are transcribed on device, and OpenRouter finds the ads. If an OpenRouter request fails, Apple Intelligence on this device is tried instead.";
 
 /* Name for finding ads with Apple Intelligence on the device */
 "ad_skipping_classifier_on_device" = "On device";

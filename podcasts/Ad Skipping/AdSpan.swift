@@ -174,7 +174,7 @@ enum AdSkippingError: LocalizedError {
         case .notDownloaded:
             "The episode isn't downloaded"
         case .noClassifier:
-            "Add an OpenRouter key, or turn on Apple Intelligence to find ads on device"
+            "Add an OpenRouter key to find ads"
         case .transcriptionUnavailable:
             "On-device transcription needs iOS 26 or later on a supported device"
         case .unsupportedLocale(let locale):

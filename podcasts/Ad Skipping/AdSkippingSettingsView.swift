@@ -2,44 +2,78 @@ import PocketCastsDataModel
 import PocketCastsUtils
 import SwiftUI
 
-/// Where the listener enters their Claude API key and can see what's been found
+/// Where the listener sees how ads are found, enters an OpenRouter key, and sees what's been found
 struct AdSkippingSettingsView: View {
     @ObservedObject private var manager = AdSkippingManager.shared
 
     @State private var apiKeyDraft = ""
+    @State private var modelDraft = ""
     @State private var analyses: [EpisodeAdAnalysis] = []
 
     var body: some View {
         List {
-            apiKeySection
+            classifierSection
+            openRouterSection
             nowPlayingSection
             analysesSection
         }
         .miniPlayerSafeAreaInset()
-        .onAppear(perform: reloadAnalyses)
+        .onAppear {
+            modelDraft = manager.openRouterModel
+            reloadAnalyses()
+        }
+        .onDisappear {
+            manager.openRouterModel = modelDraft
+        }
         .onChange(of: manager.analysesVersion) { _, _ in
             reloadAnalyses()
         }
     }
 
-    // MARK: - API Key
+    // MARK: - Classifier
 
-    private var apiKeySection: some View {
+    private var classifierSection: some View {
         Section {
-            if manager.apiKey == nil {
+            if let active = manager.classifiers.first {
+                Text(L10n.adSkippingClassifierActive(Self.displayName(forClassifier: active.identifier)))
+            } else {
+                Text(AdSkippingError.noClassifier.localizedDescription)
+                    .foregroundStyle(.secondary)
+            }
+        } footer: {
+            Text(L10n.adSkippingClassifierFooter)
+        }
+    }
+
+    // MARK: - OpenRouter
+
+    private var openRouterSection: some View {
+        Section {
+            if manager.openRouterApiKey == nil {
                 SecureField(L10n.adSkippingApiKeyPlaceholder, text: $apiKeyDraft)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 Button(L10n.adSkippingApiKeySave) {
-                    manager.apiKey = apiKeyDraft
+                    manager.openRouterApiKey = apiKeyDraft
                     apiKeyDraft = ""
                 }
                 .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } else {
                 Text(L10n.adSkippingApiKeySaved)
                 Button(L10n.adSkippingApiKeyRemove, role: .destructive) {
-                    manager.apiKey = nil
+                    manager.openRouterApiKey = nil
                 }
+            }
+
+            LabeledContent(L10n.adSkippingModel) {
+                TextField(OpenRouterAdClassifier.defaultModel, text: $modelDraft)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit {
+                        manager.openRouterModel = modelDraft
+                        modelDraft = manager.openRouterModel
+                    }
             }
         } header: {
             Text(L10n.adSkippingApiKeyHeader)
@@ -117,10 +151,17 @@ struct AdSkippingSettingsView: View {
 
     private func summary(for analysis: EpisodeAdAnalysis) -> String {
         let adTime = analysis.spans.reduce(0) { $0 + $1.duration }
-        if let status = manager.statuses[analysis.episodeUuid], status != .finished(adCount: analysis.spans.count) {
+        if let status = manager.statuses[analysis.episodeUuid], status != .finished(adCount: analysis.spans.count, classifier: analysis.classifier) {
             return status.description
         }
-        return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime))
+        return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime), Self.displayName(forClassifier: analysis.classifier))
+    }
+
+    static func displayName(forClassifier identifier: String) -> String {
+        if identifier.hasPrefix(OpenRouterAdClassifier.identifierPrefix) {
+            return L10n.adSkippingClassifierOpenrouter(String(identifier.dropFirst(OpenRouterAdClassifier.identifierPrefix.count)))
+        }
+        return L10n.adSkippingClassifierOnDevice
     }
 
     private func format(_ time: TimeInterval) -> String {
@@ -137,8 +178,8 @@ extension AdSkippingManager.Status: CustomStringConvertible {
             L10n.adSkippingStatusTranscribing
         case .classifying:
             L10n.adSkippingStatusClassifying
-        case .finished(let adCount):
-            L10n.adSkippingStatusFinished(adCount.localized())
+        case .finished(let adCount, let classifier):
+            L10n.adSkippingStatusFinished(adCount.localized(), AdSkippingSettingsView.displayName(forClassifier: classifier))
         case .failed(let message):
             L10n.adSkippingStatusFailed(message)
         }

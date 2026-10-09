@@ -8,7 +8,8 @@ import UIKit
 /// Finds the ads in downloaded episodes and tells playback which ones to skip.
 ///
 /// When an episode finishes downloading, the local file is transcribed on device and the
-/// timestamped transcript goes to an `AdClassifier`. The resulting spans are in the timeline of
+/// timestamped transcript goes to an `AdClassifier`: OpenRouter when the listener has saved a key,
+/// otherwise Apple's on-device model, which is also the fallback if OpenRouter fails. The resulting spans are in the timeline of
 /// that download, so they're only used while it's still the file on disk.
 ///
 /// Processing runs on the main actor, but playback reads spans from the progress tick, so that state is behind a lock.
@@ -19,7 +20,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         case queued
         case transcribing
         case classifying
-        case finished(adCount: Int)
+        case finished(adCount: Int, classifier: String)
         case failed(String)
     }
 
@@ -34,7 +35,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     let store: AdSpanStore
 
     private let transcriberProvider: () -> EpisodeTranscriber?
-    private let classifierProvider: (String) -> AdClassifier
+    private let classifiersProvider: (_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier]
     private let dataManager: DataManager
 
     @MainActor
@@ -55,7 +56,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     init(store: AdSpanStore = AdSpanStore(),
          dataManager: DataManager = .shared,
          transcriberProvider: (() -> EpisodeTranscriber?)? = nil,
-         classifierProvider: ((String) -> AdClassifier)? = nil) {
+         classifiersProvider: ((_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier])? = nil) {
         self.store = store
         self.dataManager = dataManager
         self.transcriberProvider = transcriberProvider ?? {
@@ -64,7 +65,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             }
             return nil
         }
-        self.classifierProvider = classifierProvider ?? { ClaudeAdClassifier(apiKey: $0) }
+        self.classifiersProvider = classifiersProvider ?? Self.defaultClassifiers
     }
 
     @MainActor
@@ -72,12 +73,13 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         NotificationCenter.default.addObserver(self, selector: #selector(episodeDownloaded(_:)), name: Constants.Notifications.episodeDownloaded, object: nil)
     }
 
-    // MARK: - API Key
+    // MARK: - OpenRouter
 
-    private static let apiKeyKeychainKey = "AdSkippingClaudeApiKey"
+    private static let apiKeyKeychainKey = "AdSkippingOpenRouterApiKey"
+    private static let modelDefaultsKey = "AdSkippingOpenRouterModel"
 
     @MainActor
-    var apiKey: String? {
+    var openRouterApiKey: String? {
         get {
             (try? KeychainHelper.string(for: Self.apiKeyKeychainKey))?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyString
         }
@@ -89,6 +91,36 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             }
             objectWillChange.send()
         }
+    }
+
+    /// The OpenRouter model slug, like `anthropic/claude-sonnet-5.5`
+    @MainActor
+    var openRouterModel: String {
+        get {
+            UserDefaults.standard.string(forKey: Self.modelDefaultsKey)?.nilIfEmptyString ?? OpenRouterAdClassifier.defaultModel
+        }
+        set {
+            let model = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            UserDefaults.standard.set(model.isEmpty ? nil : model, forKey: Self.modelDefaultsKey)
+            objectWillChange.send()
+        }
+    }
+
+    /// The classifiers to try, in order
+    @MainActor
+    var classifiers: [AdClassifier] {
+        classifiersProvider(openRouterApiKey, openRouterModel)
+    }
+
+    private static func defaultClassifiers(openRouterApiKey: String?, openRouterModel: String) -> [AdClassifier] {
+        var classifiers: [AdClassifier] = []
+        if let openRouterApiKey {
+            classifiers.append(OpenRouterAdClassifier(apiKey: openRouterApiKey, model: openRouterModel))
+        }
+        if #available(iOS 26, *), FoundationModelsAdClassifier.isAvailable {
+            classifiers.append(FoundationModelsAdClassifier())
+        }
+        return classifiers
     }
 
     // MARK: - Playback
@@ -185,9 +217,9 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         }
 
         do {
-            let spans = try await analyze(uuid)
-            statuses[uuid] = .finished(adCount: spans.count)
-            FileLog.shared.addMessage("AdSkipping: found \(spans.count) ads in \(uuid)")
+            let (spans, classifier) = try await analyze(uuid)
+            statuses[uuid] = .finished(adCount: spans.count, classifier: classifier)
+            FileLog.shared.addMessage("AdSkipping: \(classifier) found \(spans.count) ads in \(uuid)")
         } catch {
             statuses[uuid] = .failed(error.localizedDescription)
             FileLog.shared.addMessage("AdSkipping: failed to analyze \(uuid): \(error)")
@@ -195,13 +227,14 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor
-    private func analyze(_ uuid: String) async throws -> [AdSpan] {
+    private func analyze(_ uuid: String) async throws -> (spans: [AdSpan], classifier: String) {
         guard let episode = dataManager.findEpisode(uuid: uuid), episode.downloaded(pathFinder: DownloadManager.shared) else {
             throw AdSkippingError.notDownloaded
         }
 
-        guard let apiKey else {
-            throw AdSkippingError.missingApiKey
+        let classifiers = classifiers
+        guard !classifiers.isEmpty else {
+            throw AdSkippingError.noClassifier
         }
 
         guard let transcriber = transcriberProvider() else {
@@ -219,9 +252,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         }
 
         statuses[uuid] = .classifying
-        let classifier = classifierProvider(apiKey)
         let context = AdClassificationContext(podcastTitle: episode.parentPodcast(dataManager: dataManager)?.title, episodeTitle: episode.title, duration: episode.duration)
-        let spans = try await classifier.adSpans(in: transcript, context: context)
+        let (spans, classifier) = try await classify(transcript, context: context, using: classifiers)
 
         let analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion,
                                          episodeUuid: uuid,
@@ -234,7 +266,22 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         forgetFileMatch(for: uuid)
         analysesVersion += 1
 
-        return spans
+        return (spans, classifier.identifier)
+    }
+
+    /// Tries each classifier in turn until one succeeds
+    @MainActor
+    private func classify(_ transcript: [TranscriptSegment], context: AdClassificationContext, using classifiers: [AdClassifier]) async throws -> ([AdSpan], AdClassifier) {
+        var lastError: Error = AdSkippingError.noClassifier
+        for classifier in classifiers {
+            do {
+                return (try await classifier.adSpans(in: transcript, context: context), classifier)
+            } catch {
+                FileLog.shared.addMessage("AdSkipping: \(classifier.identifier) failed, trying the next classifier: \(error)")
+                lastError = error
+            }
+        }
+        throw lastError
     }
 
     private static func fileSize(of episode: BaseEpisode) -> UInt64? {

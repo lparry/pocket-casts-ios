@@ -6703,23 +6703,38 @@
 /* Title of the settings screen, and its row, for automatically skipping ads */
 "ad_skipping_title" = "Ad Skipping";
 
-/* Header above the Claude API key field on the ad skipping settings screen */
-"ad_skipping_api_key_header" = "Claude API Key";
+/* Header above the OpenRouter API key and model fields on the ad skipping settings screen. OpenRouter is a product name */
+"ad_skipping_api_key_header" = "OpenRouter";
 
-/* Placeholder for the field where the user pastes their Claude API key */
-"ad_skipping_api_key_placeholder" = "sk-ant-…";
+/* Placeholder for the field where the user pastes their OpenRouter API key */
+"ad_skipping_api_key_placeholder" = "sk-or-…";
 
-/* Button that saves the Claude API key the user entered */
+/* Button that saves the OpenRouter API key the user entered */
 "ad_skipping_api_key_save" = "Save Key";
 
-/* Shown on the ad skipping settings screen once a Claude API key is saved */
+/* Shown on the ad skipping settings screen once an OpenRouter API key is saved */
 "ad_skipping_api_key_saved" = "A key is saved on this device";
 
-/* Button that deletes the saved Claude API key */
+/* Button that deletes the saved OpenRouter API key */
 "ad_skipping_api_key_remove" = "Remove Key";
 
-/* Explains where the Claude API key is kept and what's sent to Anthropic */
-"ad_skipping_api_key_footer" = "The key stays in this device's keychain. After an episode downloads, it's transcribed on device and the transcript is sent to the Claude API to find the ads.";
+/* Explains where the OpenRouter key is kept, what's sent to OpenRouter, and what the model field is */
+"ad_skipping_api_key_footer" = "With a key, transcripts are sent to this OpenRouter model to find the ads, instead of finding them on device. The key stays in this device's keychain.";
+
+/* Label for the field holding the OpenRouter model name, like anthropic/claude-sonnet-5.5 */
+"ad_skipping_model" = "Model";
+
+/* Says which model finds the ads. %1$@ is the model, like "On device" or "OpenRouter · anthropic/claude-sonnet-5.5" */
+"ad_skipping_classifier_active" = "Finding ads with %1$@";
+
+/* Explains how ad finding works and the on-device fallback */
+"ad_skipping_classifier_footer" = "Downloaded episodes are transcribed on device. Ads are found on device with Apple Intelligence, or with OpenRouter when a key is saved, falling back to on device if OpenRouter fails.";
+
+/* Name for finding ads with Apple Intelligence on the device */
+"ad_skipping_classifier_on_device" = "On device";
+
+/* Name for finding ads with OpenRouter. %1$@ is the model, like anthropic/claude-sonnet-5.5. OpenRouter is a product name */
+"ad_skipping_classifier_openrouter" = "OpenRouter · %1$@";
 
 /* Header above the currently playing episode on the ad skipping settings screen */
 "ad_skipping_now_playing" = "Now Playing";
@@ -6739,8 +6754,8 @@
 /* Time range of one ad. %1$@ is where it starts and %2$@ is where it ends, like 12:30 */
 "ad_skipping_span_range" = "%1$@ – %2$@";
 
-/* Summary of the ads found in an episode. %1$@ is the number of ads and %2$@ is their total length, like 3:45 */
-"ad_skipping_summary" = "Ads: %1$@ · %2$@";
+/* Summary of the ads found in an episode. %1$@ is the number of ads, %2$@ is their total length, like 3:45, and %3$@ is what found them, like "On device" */
+"ad_skipping_summary" = "Ads: %1$@ · %2$@ · %3$@";
 
 /* Status of an episode waiting to have its ads found */
 "ad_skipping_status_queued" = "Waiting…";
@@ -6748,11 +6763,11 @@
 /* Status while an episode is being transcribed on device */
 "ad_skipping_status_transcribing" = "Transcribing…";
 
-/* Status while Claude is finding the ads in an episode's transcript */
+/* Status while a model is finding the ads in an episode's transcript */
 "ad_skipping_status_classifying" = "Finding ads…";
 
-/* Status once the ads are found. %1$@ is the number of ads */
-"ad_skipping_status_finished" = "Ads found: %1$@";
+/* Status once the ads are found. %1$@ is the number of ads and %2$@ is what found them, like "On device" */
+"ad_skipping_status_finished" = "Ads found: %1$@ · %2$@";
 
 /* Status when finding the ads failed. %1$@ is the error message */
 "ad_skipping_status_failed" = "Failed: %1$@";

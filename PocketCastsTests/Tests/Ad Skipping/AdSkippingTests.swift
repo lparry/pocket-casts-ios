@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import podcasts
 
-final class ClaudeAdClassifierTests: XCTestCase {
+final class OpenRouterAdClassifierTests: XCTestCase {
     private let transcript = [
         TranscriptSegment(start: 0, end: 4.5, text: "Welcome back to the show."),
         TranscriptSegment(start: 4.5, end: 30, text: "This episode is brought to you by Acme."),
@@ -12,14 +12,14 @@ final class ClaudeAdClassifierTests: XCTestCase {
     private let context = AdClassificationContext(podcastTitle: "The Show", episodeTitle: "Episode 1", duration: 100)
 
     override func tearDown() {
-        ClaudeURLProtocol.requestHandler = nil
+        OpenRouterURLProtocol.requestHandler = nil
         super.tearDown()
     }
 
-    func testSendsTranscriptToClaudeAndParsesSpans() async throws {
+    func testSendsTranscriptToOpenRouterAndParsesSpans() async throws {
         var receivedRequest: URLRequest?
         var receivedBody: [String: Any]?
-        ClaudeURLProtocol.requestHandler = { request in
+        OpenRouterURLProtocol.requestHandler = { request in
             receivedRequest = request
             receivedBody = try JSONSerialization.jsonObject(with: request.bodyData) as? [String: Any]
             return Self.success(ads: [
@@ -32,23 +32,24 @@ final class ClaudeAdClassifierTests: XCTestCase {
         XCTAssertEqual(spans, [AdSpan(start: 4.5, end: 30, kind: .hostRead, sponsor: "Acme")])
 
         let request = try XCTUnwrap(receivedRequest)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "x-api-key"), "test-key")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-version"), "2023-06-01")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-beta"), "server-side-fallback-2026-07-01")
+        XCTAssertEqual(request.url?.absoluteString, "https://openrouter.ai/api/v1/chat/completions")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
 
         let body = try XCTUnwrap(receivedBody)
-        XCTAssertEqual(body["model"] as? String, ClaudeAdClassifier.model)
-        XCTAssertEqual(body["fallbacks"] as? String, "default")
-        let outputConfig = try XCTUnwrap(body["output_config"] as? [String: Any])
-        XCTAssertEqual((outputConfig["format"] as? [String: Any])?["type"] as? String, "json_schema")
+        XCTAssertEqual(body["model"] as? String, "test/model")
+        let responseFormat = try XCTUnwrap(body["response_format"] as? [String: Any])
+        XCTAssertEqual(responseFormat["type"] as? String, "json_schema")
+        XCTAssertEqual((responseFormat["json_schema"] as? [String: Any])?["strict"] as? Bool, true)
 
-        let message = try XCTUnwrap((body["messages"] as? [[String: Any]])?.first?["content"] as? String)
-        XCTAssertTrue(message.contains("Podcast: The Show"))
-        XCTAssertTrue(message.contains("[4.5-30.0] This episode is brought to you by Acme."))
+        let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.map { $0["role"] as? String }, ["system", "user"])
+        let prompt = try XCTUnwrap(messages.last?["content"] as? String)
+        XCTAssertTrue(prompt.contains("Podcast: The Show"))
+        XCTAssertTrue(prompt.contains("[4.5-30.0] This episode is brought to you by Acme."))
     }
 
     func testCleansUpSpans() async throws {
-        ClaudeURLProtocol.requestHandler = { _ in
+        OpenRouterURLProtocol.requestHandler = { _ in
             Self.success(ads: [
                 ["start": 60, "end": 120, "kind": "inserted", "sponsor": ""],
                 ["start": 10, "end": 30, "kind": "host_read", "sponsor": "Acme"],
@@ -65,59 +66,98 @@ final class ClaudeAdClassifierTests: XCTestCase {
         ])
     }
 
-    func testRetriesWithoutFallbacksWhenTheRequestIsRejected() async throws {
-        var requests: [URLRequest] = []
-        ClaudeURLProtocol.requestHandler = { request in
-            requests.append(request)
-            if requests.count == 1 {
-                let body = #"{"type":"error","error":{"type":"invalid_request_error","message":"fallbacks: unsupported"}}"#
-                return (HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
-            }
-            return Self.success(ads: [])
+    func testThrowsOnHTTPErrors() async {
+        OpenRouterURLProtocol.requestHandler = { request in
+            let body = #"{"error":{"code":401,"message":"No auth credentials found"}}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
         }
 
-        let spans = try await makeClassifier().adSpans(in: transcript, context: context)
-
-        XCTAssertEqual(spans, [])
-        XCTAssertEqual(requests.count, 2)
-        XCTAssertNil(requests.last?.value(forHTTPHeaderField: "anthropic-beta"))
-        let retryBody = try JSONSerialization.jsonObject(with: try XCTUnwrap(requests.last).bodyData) as? [String: Any]
-        XCTAssertNil(retryBody?["fallbacks"])
+        do {
+            _ = try await makeClassifier().adSpans(in: transcript, context: context)
+            XCTFail("Expected the request to throw")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "OpenRouter error: No auth credentials found")
+        }
     }
 
-    func testThrowsOnRefusal() async {
-        ClaudeURLProtocol.requestHandler = { request in
-            let body = #"{"content":[],"stop_reason":"refusal"}"#
+    func testThrowsOnUpstreamErrorsReturnedWithA200() async {
+        OpenRouterURLProtocol.requestHandler = { request in
+            let body = #"{"error":{"code":502,"message":"Provider returned error"}}"#
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
         }
 
         do {
             _ = try await makeClassifier().adSpans(in: transcript, context: context)
-            XCTFail("Expected the refusal to throw")
+            XCTFail("Expected the request to throw")
         } catch {
-            XCTAssertEqual(error.localizedDescription, "Claude declined to classify this episode")
+            XCTAssertEqual(error.localizedDescription, "OpenRouter error: Provider returned error")
+        }
+    }
+
+    func testThrowsWhenTheResponseIsCutOff() async {
+        OpenRouterURLProtocol.requestHandler = { request in
+            let body = #"{"choices":[{"message":{"content":"{\"ads\": ["},"finish_reason":"length"}]}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+
+        do {
+            _ = try await makeClassifier().adSpans(in: transcript, context: context)
+            XCTFail("Expected the request to throw")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "The model's response was cut off")
         }
     }
 
     // MARK: - Helpers
 
-    private func makeClassifier() -> ClaudeAdClassifier {
+    private func makeClassifier() -> OpenRouterAdClassifier {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [ClaudeURLProtocol.self]
-        return ClaudeAdClassifier(apiKey: "test-key", session: URLSession(configuration: configuration))
+        configuration.protocolClasses = [OpenRouterURLProtocol.self]
+        return OpenRouterAdClassifier(apiKey: "test-key", model: "test/model", session: URLSession(configuration: configuration))
     }
 
     private static func success(ads: [[String: Any]]) -> (HTTPURLResponse, Data) {
         let output = try! JSONSerialization.data(withJSONObject: ["ads": ads])
         let body: [String: Any] = [
-            "content": [
-                ["type": "thinking", "thinking": ""],
-                ["type": "text", "text": String(decoding: output, as: UTF8.self)]
-            ],
-            "stop_reason": "end_turn"
+            "choices": [
+                ["message": ["role": "assistant", "content": String(decoding: output, as: UTF8.self)], "finish_reason": "stop"]
+            ]
         ]
-        let response = HTTPURLResponse(url: URL(string: "https://api.anthropic.com/v1/messages")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let response = HTTPURLResponse(url: URL(string: "https://openrouter.ai/api/v1/chat/completions")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
         return (response, try! JSONSerialization.data(withJSONObject: body))
+    }
+}
+
+@available(iOS 26, *)
+final class FoundationModelsAdClassifierChunkingTests: XCTestCase {
+    private let transcript = (0..<10).map { index in
+        TranscriptSegment(start: Double(index * 10), end: Double(index * 10 + 10), text: String(repeating: "a", count: 80))
+    }
+
+    func testFitsEachChunkInTheBudgetAndOverlapsThem() {
+        // Each line is about 93 characters, so three fit in 300
+        let chunks = FoundationModelsAdClassifier.chunks(of: transcript, characterBudget: 300, overlap: 1)
+
+        XCTAssertEqual(chunks.map { $0.map(\.start) }, [
+            [0, 10, 20],
+            [20, 30, 40],
+            [40, 50, 60],
+            [60, 70, 80],
+            [80, 90]
+        ])
+    }
+
+    func testKeepsTheWholeTranscriptInOneChunkWhenItFits() {
+        let chunks = FoundationModelsAdClassifier.chunks(of: transcript, characterBudget: 10_000, overlap: 4)
+
+        XCTAssertEqual(chunks, [transcript])
+    }
+
+    func testAlwaysMovesForwardWhenLinesAreLongerThanTheBudget() {
+        let chunks = FoundationModelsAdClassifier.chunks(of: transcript, characterBudget: 10, overlap: 4)
+
+        XCTAssertEqual(chunks.count, transcript.count)
+        XCTAssertEqual(chunks.map(\.count), Array(repeating: 1, count: transcript.count))
     }
 }
 
@@ -172,7 +212,7 @@ final class AdSpanStoreTests: XCTestCase {
     }
 }
 
-private final class ClaudeURLProtocol: URLProtocol {
+private final class OpenRouterURLProtocol: URLProtocol {
     static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 
     override class func canInit(with request: URLRequest) -> Bool {

@@ -62,6 +62,9 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         /// Whether each episode's stored analysis was made from the file that's on disk now
         var analysisMatchesFile: [String: Bool] = [:]
+
+        /// The kinds of ad the listener wants skipped
+        var skippedKinds: Set<AdSpan.Kind> = AdSkippingManager.loadSkippedKinds()
     }
 
     private let playbackState = OSAllocatedUnfairLock(initialState: PlaybackState())
@@ -160,6 +163,36 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         scanMissing()
     }
 
+    // MARK: - Kinds
+
+    private static let skippedKindsDefaultsKey = "AdSkippingSkippedKinds"
+
+    /// Every kind is skipped until the listener turns one off. Spans keep their kind, so changing this needs no rescan.
+    var skippedKinds: Set<AdSpan.Kind> {
+        playbackState.withLock { $0.skippedKinds }
+    }
+
+    @MainActor
+    func setSkipping(_ kind: AdSpan.Kind, _ skip: Bool) {
+        let kinds = playbackState.withLock { state in
+            if skip {
+                state.skippedKinds.insert(kind)
+            } else {
+                state.skippedKinds.remove(kind)
+            }
+            return state.skippedKinds
+        }
+        UserDefaults.standard.set(kinds.map(\.rawValue).sorted(), forKey: Self.skippedKindsDefaultsKey)
+        objectWillChange.send()
+    }
+
+    private static func loadSkippedKinds() -> Set<AdSpan.Kind> {
+        guard let rawValues = UserDefaults.standard.stringArray(forKey: skippedKindsDefaultsKey) else {
+            return Set(AdSpan.Kind.allCases)
+        }
+        return Set(rawValues.compactMap(AdSpan.Kind.init(rawValue:)))
+    }
+
     // MARK: - Playback
 
     /// The ad to skip at `time`, if any
@@ -168,9 +201,13 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             return nil
         }
 
-        let restored = playbackState.withLock { $0.restoredSpans[episode.uuid] } ?? []
+        let (restored, skippedKinds) = playbackState.withLock { ($0.restoredSpans[episode.uuid] ?? [], $0.skippedKinds) }
+        return Self.adToSkip(in: analysis.spans, at: time, skipping: skippedKinds, restored: restored)
+    }
+
+    static func adToSkip(in spans: [AdSpan], at time: TimeInterval, skipping kinds: Set<AdSpan.Kind>, restored: Set<AdSpan>) -> AdSpan? {
         // Don't bother skipping the last moment of an ad
-        return analysis.spans.first { $0.contains(time) && $0.end - time > 1 && !restored.contains($0) }
+        spans.first { $0.contains(time) && $0.end - time > 1 && kinds.contains($0.kind) && !restored.contains($0) }
     }
 
     /// Stops `span` being skipped again until the next launch

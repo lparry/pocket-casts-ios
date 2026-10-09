@@ -6777,3 +6777,21 @@
 
 /* Status when finding the ads failed. %1$@ is the error message */
 "ad_skipping_status_failed" = "Failed: %1$@";
+
+/* Header above the switches for which kinds of ad to skip */
+"ad_skipping_kinds_header" = "Skip";
+
+/* Explains that the ad kind switches apply straight away */
+"ad_skipping_kinds_footer" = "Ads that are already found keep their kind, so changes apply straight away.";
+
+/* Kind of ad: a sponsor message read by the podcast's hosts */
+"ad_skipping_kind_host_read" = "Sponsor reads";
+
+/* Kind of ad: a produced or dynamically inserted ad */
+"ad_skipping_kind_inserted" = "Inserted ads";
+
+/* Kind of ad: a trailer or promo for another podcast */
+"ad_skipping_kind_cross_promo" = "Promos for other shows";
+
+/* Kind of ad: the show asking for support, reviews, memberships or merch */
+"ad_skipping_kind_self_promo" = "Self-promotion";

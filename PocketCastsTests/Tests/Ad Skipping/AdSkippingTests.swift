@@ -173,6 +173,30 @@ final class AdSkippingScanOrderTests: XCTestCase {
     }
 }
 
+final class AdSkippingPlaybackTests: XCTestCase {
+    private let spans = [
+        AdSpan(start: 10, end: 40, kind: .hostRead, sponsor: "Acme"),
+        AdSpan(start: 100, end: 130, kind: .selfPromo, sponsor: nil)
+    ]
+
+    func testSkipsTheAdThatContainsTheTime() {
+        let ad = AdSkippingManager.adToSkip(in: spans, at: 12, skipping: Set(AdSpan.Kind.allCases), restored: [])
+
+        XCTAssertEqual(ad, spans[0])
+        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 50, skipping: Set(AdSpan.Kind.allCases), restored: []))
+    }
+
+    func testOnlySkipsTheChosenKinds() {
+        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 110, skipping: [.hostRead], restored: []))
+        XCTAssertEqual(AdSkippingManager.adToSkip(in: spans, at: 110, skipping: [.selfPromo], restored: []), spans[1])
+    }
+
+    func testDoesntSkipRestoredAdsOrTheLastSecond() {
+        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 12, skipping: Set(AdSpan.Kind.allCases), restored: [spans[0]]))
+        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 39.5, skipping: Set(AdSpan.Kind.allCases), restored: []))
+    }
+}
+
 final class AdSpanStoreTests: XCTestCase {
     private var directory: URL!
 

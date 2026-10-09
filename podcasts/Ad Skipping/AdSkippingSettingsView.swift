@@ -13,6 +13,7 @@ struct AdSkippingSettingsView: View {
     var body: some View {
         List {
             classifierSection
+            kindsSection
             openRouterSection
             episodesSection
         }
@@ -42,6 +43,23 @@ struct AdSkippingSettingsView: View {
             }
         } footer: {
             Text(L10n.adSkippingClassifierFooter)
+        }
+    }
+
+    // MARK: - Kinds
+
+    private var kindsSection: some View {
+        Section {
+            ForEach(AdSpan.Kind.allCases, id: \.self) { kind in
+                Toggle(kind.displayName, isOn: Binding(
+                    get: { manager.skippedKinds.contains(kind) },
+                    set: { manager.setSkipping(kind, $0) }
+                ))
+            }
+        } header: {
+            Text(L10n.adSkippingKindsHeader)
+        } footer: {
+            Text(L10n.adSkippingKindsFooter)
         }
     }
 
@@ -113,7 +131,7 @@ struct AdSkippingSettingsView: View {
                     VStack(alignment: .leading) {
                         Text(L10n.adSkippingSpanRange(format(span.start), format(span.end)))
                             .monospacedDigit()
-                        Text([span.kind.rawValue, span.sponsor].compactMap { $0 }.joined(separator: " · "))
+                        Text([span.kind.displayName, span.sponsor].compactMap { $0 }.joined(separator: " · "))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -210,6 +228,21 @@ extension AdSkippingManager.Status: CustomStringConvertible {
             L10n.adSkippingStatusFinished(adCount.localized(), AdSkippingSettingsView.displayName(forClassifier: classifier))
         case .failed(let message):
             L10n.adSkippingStatusFailed(message)
+        }
+    }
+}
+
+extension AdSpan.Kind {
+    var displayName: String {
+        switch self {
+        case .hostRead:
+            L10n.adSkippingKindHostRead
+        case .inserted:
+            L10n.adSkippingKindInserted
+        case .crossPromo:
+            L10n.adSkippingKindCrossPromo
+        case .selfPromo:
+            L10n.adSkippingKindSelfPromo
         }
     }
 }

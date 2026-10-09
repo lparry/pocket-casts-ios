@@ -128,6 +128,14 @@ struct AdSkippingSettingsView: View {
         }
         return L10n.adSkippingClassifierOnDevice
     }
+
+    /// Just the model, like `anthropic/claude-sonnet-5.5`, or on device
+    static func modelName(forClassifier identifier: String) -> String {
+        if identifier.hasPrefix(OpenRouterAdClassifier.identifierPrefix) {
+            return String(identifier.dropFirst(OpenRouterAdClassifier.identifierPrefix.count))
+        }
+        return L10n.adSkippingClassifierOnDevice
+    }
 }
 
 extension AdSkippingManager.Status: CustomStringConvertible {
@@ -143,8 +151,8 @@ extension AdSkippingManager.Status: CustomStringConvertible {
             L10n.adSkippingStatusTranscribing
         case .classifying:
             L10n.adSkippingStatusClassifying
-        case .finished(let adCount, let classifier):
-            L10n.adSkippingStatusFinished(adCount.localized(), AdSkippingSettingsView.displayName(forClassifier: classifier))
+        case .finished(let adCount, _):
+            L10n.adSkippingStatusFinished(adCount.localized())
         case .failed(let message):
             L10n.adSkippingStatusFailed(message)
         case .waitingForUpNext:

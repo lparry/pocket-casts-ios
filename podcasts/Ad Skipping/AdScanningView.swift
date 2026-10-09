@@ -67,34 +67,37 @@ struct AdScanningView: View {
         }
     }
 
-    @ViewBuilder
+    /// The row only says how the scan went. Which model found the ads, how long it took, the Scan button and the ads
+    /// themselves are behind the chevron.
     private func row(for episode: BaseEpisode) -> some View {
         let analysis = manager.currentAnalysis(for: episode)
 
-        if let analysis, !analysis.spans.isEmpty || analysis.timings != nil {
-            DisclosureGroup(isExpanded: isExpanded(episode, analysis: analysis)) {
-                if let timings = analysis.timings {
-                    Text(timingsDescription(timings))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        return DisclosureGroup(isExpanded: isExpanded(episode, analysis: analysis)) {
+            if let analysis {
+                Text(detailsDescription(analysis))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
+            if manager.isScanning(episode), !isInProgress(episode) {
+                Button(analysis == nil ? L10n.adSkippingScan : L10n.adSkippingRescan) {
+                    manager.enqueue(episode.uuid, force: true, first: true, requested: true)
+                }
+                .buttonStyle(.borderless)
+            }
+
+            if let analysis {
                 ForEach(analysis.spans, id: \.self) { span in
                     adRow(span, in: episode)
                 }
-            } label: {
-                rowLabel(for: episode, analysis: analysis)
             }
-            .swipeActions {
+        } label: {
+            rowLabel(for: episode, analysis: analysis)
+        }
+        .swipeActions {
+            if analysis != nil {
                 forgetButton(for: episode)
             }
-        } else {
-            rowLabel(for: episode, analysis: analysis)
-                .swipeActions {
-                    if analysis != nil {
-                        forgetButton(for: episode)
-                    }
-                }
         }
     }
 
@@ -147,13 +150,15 @@ struct AdScanningView: View {
         }
     }
 
-    private func isExpanded(_ episode: BaseEpisode, analysis: EpisodeAdAnalysis) -> Binding<Bool> {
+    private func isExpanded(_ episode: BaseEpisode, analysis: EpisodeAdAnalysis?) -> Binding<Bool> {
         Binding {
             expanded.contains(episode.uuid)
         } set: { isExpanded in
             if isExpanded {
                 expanded.insert(episode.uuid)
-                loadTranscripts(for: episode, analysis: analysis)
+                if let analysis {
+                    loadTranscripts(for: episode, analysis: analysis)
+                }
             } else {
                 expanded.remove(episode.uuid)
             }
@@ -185,15 +190,6 @@ struct AdScanningView: View {
                 Text(state(for: episode, analysis: analysis))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if manager.isScanning(episode), !isInProgress(episode) {
-                Button(analysis == nil ? L10n.adSkippingScan : L10n.adSkippingRescan) {
-                    manager.enqueue(episode.uuid, force: true, first: true, requested: true)
-                }
-                .buttonStyle(.borderless)
             }
         }
     }
@@ -233,10 +229,16 @@ struct AdScanningView: View {
             if analysis.isSuspect {
                 return L10n.adSkippingStatusSuspect(analysis.spans.count.localized(), format(adTime))
             }
-            return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime), AdSkippingSettingsView.displayName(forClassifier: analysis.classifier))
+            return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime))
         case .some(let status):
             return status.description
         }
+    }
+
+    private func detailsDescription(_ analysis: EpisodeAdAnalysis) -> String {
+        let foundBy = L10n.adScanningFoundBy(AdSkippingSettingsView.modelName(forClassifier: analysis.classifier))
+        guard let timings = analysis.timings else { return foundBy }
+        return foundBy + "\n" + timingsDescription(timings)
     }
 
     private func timingsDescription(_ timings: AdScanTimings) -> String {

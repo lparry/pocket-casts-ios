@@ -6763,8 +6763,8 @@
 /* Time range of one ad. %1$@ is where it starts and %2$@ is where it ends, like 12:30 */
 "ad_skipping_span_range" = "%1$@ – %2$@";
 
-/* Summary of the ads found in an episode. %1$@ is the number of ads, %2$@ is their total length, like 3:45, and %3$@ is what found them, like "On device" */
-"ad_skipping_summary" = "Ads: %1$@ · %2$@ · %3$@";
+/* Summary of the ads found in an episode. %1$@ is the number of ads and %2$@ is their total length, like 3:45 */
+"ad_skipping_summary" = "Ads: %1$@ · %2$@";
 
 /* Status of an episode waiting to have its ads found */
 "ad_skipping_status_queued" = "Queued";
@@ -6781,8 +6781,8 @@
 /* Status while a model is finding the ads in an episode's transcript */
 "ad_skipping_status_classifying" = "Finding ads…";
 
-/* Status once the ads are found. %1$@ is the number of ads and %2$@ is what found them, like "On device" */
-"ad_skipping_status_finished" = "Ads found: %1$@ · %2$@";
+/* Status once the ads are found. %1$@ is the number of ads */
+"ad_skipping_status_finished" = "Ads found: %1$@";
 
 /* Status when finding the ads failed. %1$@ is the error message */
 "ad_skipping_status_failed" = "Failed: %1$@";
@@ -6849,6 +6849,9 @@
 
 /* Status of a downloaded episode that won't be transcribed until the phone is charging */
 "ad_skipping_status_waiting_for_power" = "Waiting for charging to transcribe";
+
+/* Which model found an episode's ads, shown when its row is expanded. %1$@ is the model, like anthropic/claude-sonnet-5.5 or "On device" */
+"ad_scanning_found_by" = "Found by %1$@";
 
 /* Accessibility label for the button that plays an episode from just before an ad that was found, without skipping it */
 "ad_scanning_play_ad" = "Play this ad";

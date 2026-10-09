@@ -57,6 +57,13 @@ struct AdSkip: Equatable {
     }
 }
 
+/// What was said in an ad, and just before and after it, to check it was found in the right place
+struct AdTranscriptExcerpt: Equatable {
+    let before: String
+    let ad: String
+    let after: String
+}
+
 /// One word of an on-device transcript, with when it was spoken
 struct TimedWord: Codable, Equatable {
     let start: TimeInterval

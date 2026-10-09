@@ -6825,3 +6825,18 @@
 
 /* How long the rest of a scan took. %1$@ is finding the ads, %2$@ is placing their edges on exact words, and %3$@ is lining the edges up with the audio, each like 0:08 */
 "ad_scanning_timings_steps" = "Finding ads %1$@ · Edges %2$@ · Audio %3$@";
+
+/* Accessibility label for the button that plays an episode from just before an ad that was found, without skipping it */
+"ad_scanning_play_ad" = "Play this ad";
+
+/* Shown under an ad that was found when the transcript it was found in is no longer saved, so its words can't be shown */
+"ad_scanning_transcript_missing" = "The transcript for this ad wasn't saved";
+
+/* Shown under an ad that was found when no words were transcribed within it */
+"ad_scanning_transcript_empty" = "No words were transcribed in this ad";
+
+/* Button that shows the whole transcript of an ad that was found */
+"ad_scanning_show_more" = "Show more";
+
+/* Button that shortens the transcript of an ad that was found back to a few lines */
+"ad_scanning_show_less" = "Show less";

@@ -731,6 +731,50 @@ final class AdScanFailureTests: XCTestCase {
     }
 }
 
+final class AdTranscriptExcerptTests: XCTestCase {
+    private let words = [
+        TimedWord(start: 0, end: 1, text: "Before"),
+        TimedWord(start: 7, end: 8, text: "anyway."),
+        TimedWord(start: 9.6, end: 10.2, text: "Brought"),
+        TimedWord(start: 10.2, end: 11, text: "to"),
+        TimedWord(start: 11, end: 12, text: "you"),
+        TimedWord(start: 29, end: 30.6, text: "Acme."),
+        TimedWord(start: 31, end: 32, text: "Back"),
+        TimedWord(start: 40, end: 41, text: "later")
+    ]
+
+    func testTakesTheWordsWhoseMiddleIsInTheAdWithAFewSecondsEitherSide() {
+        let ad = AdSpan(start: 10, end: 30, kind: .hostRead, sponsor: "Acme")
+
+        let excerpts = AdSkippingManager.adTranscripts(of: [ad], in: [TranscriptSegment(start: 0, end: 41, text: "", words: words)])
+
+        XCTAssertEqual(excerpts[ad], AdTranscriptExcerpt(before: "anyway. Brought", ad: "to you Acme.", after: "Back"))
+    }
+
+    func testUsesWholeLinesWithoutWordTimings() {
+        let transcript = [
+            TranscriptSegment(start: 0, end: 10, text: "The show."),
+            TranscriptSegment(start: 10, end: 20, text: "This episode is brought to you by Acme."),
+            TranscriptSegment(start: 20, end: 30, text: "Back to it.")
+        ]
+        let ad = AdSpan(start: 10, end: 20, kind: .hostRead, sponsor: nil)
+
+        let excerpts = AdSkippingManager.adTranscripts(of: [ad], in: transcript)
+
+        XCTAssertEqual(excerpts[ad]?.ad, "This episode is brought to you by Acme.")
+        XCTAssertEqual(excerpts[ad]?.before, "The show.")
+        XCTAssertEqual(excerpts[ad]?.after, "", "The next line's middle is too far after the ad")
+    }
+
+    func testGivesAnEmptyExcerptForAnAdWithNoWords() {
+        let ad = AdSpan(start: 50, end: 70, kind: .inserted, sponsor: nil)
+
+        let excerpts = AdSkippingManager.adTranscripts(of: [ad], in: [TranscriptSegment(start: 0, end: 41, text: "", words: words)])
+
+        XCTAssertEqual(excerpts[ad], AdTranscriptExcerpt(before: "", ad: "", after: ""))
+    }
+}
+
 final class AdSpanStoreTests: XCTestCase {
     private var directory: URL!
 

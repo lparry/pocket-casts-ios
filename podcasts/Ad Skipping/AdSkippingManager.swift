@@ -417,6 +417,65 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return failure
     }
 
+    // MARK: - Checking Ads
+
+    /// The words spoken in each ad, read from the download's saved transcript, or nil if it wasn't kept
+    @MainActor
+    func adTranscripts(for episode: BaseEpisode, spans: [AdSpan]) async -> [AdSpan: AdTranscriptExcerpt]? {
+        await Self.loadAdTranscripts(spans: spans, episodeUuid: episode.uuid, audioFileSize: Self.fileSize(of: episode), from: transcriptStore)
+    }
+
+    /// A long transcript takes a moment to read, so it's read off the main thread
+    @concurrent
+    private static func loadAdTranscripts(spans: [AdSpan], episodeUuid: String, audioFileSize: UInt64?, from transcriptStore: TranscriptStore) async -> [AdSpan: AdTranscriptExcerpt]? {
+        guard let saved = transcriptStore.transcript(for: episodeUuid, audioFileSize: audioFileSize) else { return nil }
+        return adTranscripts(of: spans, in: saved.segments)
+    }
+
+    /// The words whose middle falls within each ad, along with a few seconds either side so its edges can be checked
+    static func adTranscripts(of spans: [AdSpan], in transcript: [TranscriptSegment], context: TimeInterval = 5) -> [AdSpan: AdTranscriptExcerpt] {
+        // Lines without word timings count as one long word
+        let words = transcript.flatMap { segment in
+            segment.words.isEmpty ? [TimedWord(start: segment.start, end: segment.end, text: segment.text)] : segment.words
+        }
+
+        func text(from start: TimeInterval, to end: TimeInterval) -> String {
+            words
+                .filter { word in
+                    let middle = (word.start + word.end) / 2
+                    return middle >= start && middle < end
+                }
+                .map(\.text)
+                .joined(separator: " ")
+        }
+
+        var excerpts: [AdSpan: AdTranscriptExcerpt] = [:]
+        for span in spans {
+            excerpts[span] = AdTranscriptExcerpt(before: text(from: span.start - context, to: span.start),
+                                                 ad: text(from: span.start, to: span.end),
+                                                 after: text(from: span.end, to: span.end + context))
+        }
+        return excerpts
+    }
+
+    /// Plays from just before an ad, and lets it play this session, so the listener can hear what was found
+    @MainActor
+    func play(_ span: AdSpan, in episode: BaseEpisode) {
+        restore([span], in: episode.uuid)
+
+        let time = max(0, span.start - 3)
+        let playbackManager = PlaybackManager.shared
+        if playbackManager.isCurrentEpisode(uuid: episode.uuid) {
+            playbackManager.seekTo(time: time, startPlaybackAfterSeek: true)
+            return
+        }
+
+        // Like playing a bookmark, start the episode where the player should pick it up
+        dataManager.saveEpisode(playedUpTo: time, episode: episode, updateSyncFlag: false)
+        dataManager.saveEpisode(playingStatus: .inProgress, episode: episode, updateSyncFlag: false)
+        PlaybackActionHelper.play(episode: episode)
+    }
+
     @MainActor
     private func hasKnownFailure(_ episode: BaseEpisode, classifiers: String) -> Bool {
         failureStore.failure(for: episode.uuid)?.matches(audioFileSize: Self.fileSize(of: episode), classifiers: classifiers) == true

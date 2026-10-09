@@ -6693,3 +6693,66 @@
 
 /* Message shown when a network the user tapped fails to load */
 "network_fail_to_load" = "This network couldn't be loaded";
+
+/* Toast shown when playback automatically skips past an ad in the episode */
+"ad_skipping_skipped" = "Skipped ad";
+
+/* Button on the skipped ad toast that goes back and plays the ad */
+"ad_skipping_undo" = "Undo";
+
+/* Title of the settings screen, and its row, for automatically skipping ads */
+"ad_skipping_title" = "Ad Skipping";
+
+/* Header above the Claude API key field on the ad skipping settings screen */
+"ad_skipping_api_key_header" = "Claude API Key";
+
+/* Placeholder for the field where the user pastes their Claude API key */
+"ad_skipping_api_key_placeholder" = "sk-ant-…";
+
+/* Button that saves the Claude API key the user entered */
+"ad_skipping_api_key_save" = "Save Key";
+
+/* Shown on the ad skipping settings screen once a Claude API key is saved */
+"ad_skipping_api_key_saved" = "A key is saved on this device";
+
+/* Button that deletes the saved Claude API key */
+"ad_skipping_api_key_remove" = "Remove Key";
+
+/* Explains where the Claude API key is kept and what's sent to Anthropic */
+"ad_skipping_api_key_footer" = "The key stays in this device's keychain. After an episode downloads, it's transcribed on device and the transcript is sent to the Claude API to find the ads.";
+
+/* Header above the currently playing episode on the ad skipping settings screen */
+"ad_skipping_now_playing" = "Now Playing";
+
+/* Button that transcribes the playing episode and finds its ads again */
+"ad_skipping_analyze" = "Find Ads in This Episode";
+
+/* Header above the list of episodes whose ads have been found */
+"ad_skipping_analyses_header" = "Episodes";
+
+/* Shown when no episodes have had their ads found yet */
+"ad_skipping_no_analyses" = "Download an episode to find its ads";
+
+/* Swipe action that deletes the ads found for an episode */
+"ad_skipping_forget" = "Forget";
+
+/* Time range of one ad. %1$@ is where it starts and %2$@ is where it ends, like 12:30 */
+"ad_skipping_span_range" = "%1$@ – %2$@";
+
+/* Summary of the ads found in an episode. %1$@ is the number of ads and %2$@ is their total length, like 3:45 */
+"ad_skipping_summary" = "Ads: %1$@ · %2$@";
+
+/* Status of an episode waiting to have its ads found */
+"ad_skipping_status_queued" = "Waiting…";
+
+/* Status while an episode is being transcribed on device */
+"ad_skipping_status_transcribing" = "Transcribing…";
+
+/* Status while Claude is finding the ads in an episode's transcript */
+"ad_skipping_status_classifying" = "Finding ads…";
+
+/* Status once the ads are found. %1$@ is the number of ads */
+"ad_skipping_status_finished" = "Ads found: %1$@";
+
+/* Status when finding the ads failed. %1$@ is the error message */
+"ad_skipping_status_failed" = "Failed: %1$@";

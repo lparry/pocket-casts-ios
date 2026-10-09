@@ -531,6 +531,31 @@ class PlaybackManager: ServerPlaybackDelegate {
         }
     }
 
+    /// Skips past an ad found in the downloaded file, offering to undo it
+    private func checkForAdSkip() {
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+        guard FeatureFlag.autoAdSkip.enabled, isPlaying, !isSeeking, let episode = currentEpisode else { return }
+
+        let time = currentTime()
+        guard let ad = AdSkippingManager.shared.adToSkip(in: episode, at: time) else { return }
+
+        let episodeDuration = duration()
+        let skipTo = episodeDuration > 0 ? min(ad.end, episodeDuration) : ad.end
+        FileLog.shared.addMessage("Skipping \(ad.kind.rawValue) ad from \(time) to \(skipTo) in \(episode.uuid)")
+        StatsManager.shared.addAutoSkipTime(skipTo - time)
+        seekTo(time: skipTo)
+
+        let episodeUuid = episode.uuid
+        Task { @MainActor [weak self] in
+            Toast.show(L10n.adSkippingSkipped, actions: [.init(title: L10n.adSkippingUndo) { [weak self] in
+                AdSkippingManager.shared.restore(ad, in: episodeUuid)
+                guard let self, currentEpisode?.uuid == episodeUuid else { return }
+                seekTo(time: time)
+            }])
+        }
+#endif
+    }
+
     var isSeeking: Bool {
         seekingTo != PlaybackManager.notSeeking
     }
@@ -1768,6 +1793,7 @@ class PlaybackManager: ServerPlaybackDelegate {
         }
 
         checkForChapterChange()
+        checkForAdSkip()
         fireProgressNotification()
 
         if updateCount > updatesPerSave {

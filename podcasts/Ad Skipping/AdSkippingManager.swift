@@ -65,6 +65,9 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         /// The kinds of ad the listener wants skipped
         var skippedKinds: Set<AdSpan.Kind> = AdSkippingManager.loadSkippedKinds()
+
+        /// Podcasts the listener knows are ad free, so they're never scanned or skipped
+        var unscannedPodcasts: Set<String> = Set(UserDefaults.standard.stringArray(forKey: AdSkippingManager.unscannedPodcastsDefaultsKey) ?? [])
     }
 
     private let playbackState = OSAllocatedUnfairLock(initialState: PlaybackState())
@@ -193,11 +196,51 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return Set(rawValues.compactMap(AdSpan.Kind.init(rawValue:)))
     }
 
+    // MARK: - Podcasts
+
+    private static let unscannedPodcastsDefaultsKey = "AdSkippingUnscannedPodcasts"
+
+    func isScanning(podcastUuid: String) -> Bool {
+        !playbackState.withLock { $0.unscannedPodcasts.contains(podcastUuid) }
+    }
+
+    /// Whether ads are found and skipped in this episode's podcast. Files the listener uploaded are always scanned.
+    func isScanning(_ episode: BaseEpisode) -> Bool {
+        guard let episode = episode as? Episode else { return true }
+        return isScanning(podcastUuid: episode.podcastUuid)
+    }
+
+    @MainActor
+    func setScanning(_ scan: Bool, podcastUuid: String) {
+        let podcasts = playbackState.withLock { state in
+            if scan {
+                state.unscannedPodcasts.remove(podcastUuid)
+            } else {
+                state.unscannedPodcasts.insert(podcastUuid)
+            }
+            return state.unscannedPodcasts
+        }
+        UserDefaults.standard.set(podcasts.sorted(), forKey: Self.unscannedPodcastsDefaultsKey)
+        objectWillChange.send()
+
+        if scan {
+            scanMissing()
+        } else {
+            let episodeUuids = Set(pending.filter { uuid in
+                dataManager.findEpisode(uuid: uuid)?.podcastUuid == podcastUuid
+            })
+            pending.removeAll { episodeUuids.contains($0) }
+            for uuid in episodeUuids {
+                statuses[uuid] = nil
+            }
+        }
+    }
+
     // MARK: - Playback
 
     /// The ad to skip at `time`, if any
     func adToSkip(in episode: BaseEpisode, at time: TimeInterval) -> AdSpan? {
-        guard FeatureFlag.autoAdSkip.enabled, let analysis = currentAnalysis(for: episode), !analysis.spans.isEmpty else {
+        guard FeatureFlag.autoAdSkip.enabled, isScanning(episode), let analysis = currentAnalysis(for: episode), !analysis.spans.isEmpty else {
             return nil
         }
 
@@ -253,7 +296,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     @MainActor
     func enqueue(_ episodeUuid: String, force: Bool = false, first: Bool = false) {
         guard FeatureFlag.autoAdSkip.enabled, processingUuid != episodeUuid else { return }
-        guard force || !isScanned(episodeUuid) else { return }
+        guard let episode = dataManager.findBaseEpisode(uuid: episodeUuid), isScanning(episode) else { return }
+        guard force || currentAnalysis(for: episode) == nil else { return }
 
         pending.removeAll { $0 == episodeUuid }
         if first {
@@ -272,7 +316,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     func scanMissing(includingFailed: Bool = false) {
         guard FeatureFlag.autoAdSkip.enabled else { return }
 
-        let episodes = downloadedEpisodes()
+        let episodes = downloadedEpisodes().filter { isScanning($0) }
         let scanned = Set(episodes.filter { currentAnalysis(for: $0) != nil }.map(\.uuid))
         let upNext = PlaybackManager.shared.queue.allEpisodes(includeNowPlaying: true).map(\.uuid)
         let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: upNext)
@@ -305,12 +349,6 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     @MainActor
     func downloadedEpisodes() -> [BaseEpisode] {
         dataManager.findDownloadedEpisodes().filter { $0.downloaded(pathFinder: DownloadManager.shared) }
-    }
-
-    @MainActor
-    private func isScanned(_ episodeUuid: String) -> Bool {
-        guard let episode = dataManager.findBaseEpisode(uuid: episodeUuid) else { return false }
-        return currentAnalysis(for: episode) != nil
     }
 
     @MainActor

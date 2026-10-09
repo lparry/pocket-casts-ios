@@ -163,7 +163,7 @@ struct AdSkippingSettingsView: View {
 
             Spacer()
 
-            if !isScanning(episode) {
+            if manager.isScanning(episode), !isInProgress(episode) {
                 Button(analysis == nil ? L10n.adSkippingScan : L10n.adSkippingRescan) {
                     manager.enqueue(episode.uuid, force: true, first: true)
                 }
@@ -178,7 +178,7 @@ struct AdSkippingSettingsView: View {
         }
     }
 
-    private func isScanning(_ episode: BaseEpisode) -> Bool {
+    private func isInProgress(_ episode: BaseEpisode) -> Bool {
         switch manager.statuses[episode.uuid] {
         case .queued, .transcribing, .classifying:
             true
@@ -192,6 +192,8 @@ struct AdSkippingSettingsView: View {
     }
 
     private func state(for episode: BaseEpisode, analysis: EpisodeAdAnalysis?) -> String {
+        guard manager.isScanning(episode) else { return L10n.adSkippingStatusOffForPodcast }
+
         switch manager.statuses[episode.uuid] {
         case .some(.finished), .none:
             guard let analysis else { return L10n.adSkippingStatusNotScanned }

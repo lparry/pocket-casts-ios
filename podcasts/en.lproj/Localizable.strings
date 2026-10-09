@@ -6795,3 +6795,9 @@
 
 /* Kind of ad: the show asking for support, reviews, memberships or merch */
 "ad_skipping_kind_self_promo" = "Self-promotion";
+
+/* Switch in a podcast's settings that turns finding and skipping ads on or off for that podcast */
+"ad_skipping_scan_for_ads" = "Scan for Ads";
+
+/* Status of a downloaded episode whose podcast has Scan for Ads turned off */
+"ad_skipping_status_off_for_podcast" = "Off for this podcast";

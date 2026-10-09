@@ -151,6 +151,17 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             }
 
             return cell
+        case .scanForAds:
+            let cell = tableView.dequeueReusableCell(withIdentifier: PodcastSettingsViewController.switchCellId, for: indexPath) as! SwitchCell
+            cell.cellLabel.text = L10n.adSkippingScanForAds
+            cell.cellSwitch.onTintColor = podcast.switchTintColor()
+            cell.setImage(UIImage(systemName: "forward.end"))
+            cell.cellSwitch.isOn = AdSkippingManager.shared.isScanning(podcastUuid: podcast.uuid)
+
+            cell.cellSwitch.removeTarget(self, action: #selector(scanForAdsChanged(_:)), for: UIControl.Event.valueChanged)
+            cell.cellSwitch.addTarget(self, action: #selector(scanForAdsChanged(_:)), for: UIControl.Event.valueChanged)
+
+            return cell
         case .autoArchive:
             let cell = tableView.dequeueReusableCell(withIdentifier: PodcastSettingsViewController.disclosureCellId, for: indexPath) as! DisclosureCell
             cell.cellLabel.text = L10n.settingsAutoArchive
@@ -370,6 +381,10 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
         Analytics.track(.podcastSettingsAutoAddUpNextToggled, properties: ["enabled": sender.isOn])
     }
 
+    @objc private func scanForAdsChanged(_ sender: UISwitch) {
+        AdSkippingManager.shared.setScanning(sender.isOn, podcastUuid: podcast.uuid)
+    }
+
     @objc private func notificationChanged(_ sender: UISwitch) {
         Analytics.track(.podcastSettingsNotificationsToggled, properties: ["enabled": sender.isOn])
         NotificationsHelper.shared.registerForPushNotifications() { [weak self] granted in
@@ -391,6 +406,10 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
 
         if podcast.refreshAvailable {
             data.insert([.feedError], at: 0)
+        }
+
+        if FeatureFlag.autoAdSkip.enabled, let playbackSection = data.firstIndex(where: { $0.contains(.skipLast) }) {
+            data[playbackSection].append(.scanForAds)
         }
 
         if podcast.autoAddToUpNextOn() {

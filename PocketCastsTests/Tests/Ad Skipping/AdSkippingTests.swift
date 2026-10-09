@@ -1,4 +1,5 @@
 import Foundation
+import PocketCastsDataModel
 import XCTest
 @testable import podcasts
 
@@ -194,6 +195,43 @@ final class AdSkippingPlaybackTests: XCTestCase {
     func testDoesntSkipRestoredAdsOrTheLastSecond() {
         XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 12, skipping: Set(AdSpan.Kind.allCases), restored: [spans[0]]))
         XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 39.5, skipping: Set(AdSpan.Kind.allCases), restored: []))
+    }
+}
+
+final class AdSkippingPodcastSettingTests: XCTestCase {
+    private var directory: URL!
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: "AdSkippingUnscannedPodcasts")
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    }
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: "AdSkippingUnscannedPodcasts")
+        try? FileManager.default.removeItem(at: directory)
+        super.tearDown()
+    }
+
+    @MainActor
+    func testScansEveryPodcastUntilOneIsTurnedOff() {
+        let manager = AdSkippingManager(store: AdSpanStore(directory: directory))
+        XCTAssertTrue(manager.isScanning(podcastUuid: "podcast"))
+
+        manager.setScanning(false, podcastUuid: "podcast")
+        XCTAssertFalse(manager.isScanning(podcastUuid: "podcast"))
+        XCTAssertTrue(manager.isScanning(podcastUuid: "other"))
+
+        let episode = Episode()
+        episode.podcastUuid = "podcast"
+        XCTAssertFalse(manager.isScanning(episode))
+        XCTAssertTrue(manager.isScanning(UserEpisode()))
+
+        // Remembered across launches
+        XCTAssertFalse(AdSkippingManager(store: AdSpanStore(directory: directory)).isScanning(podcastUuid: "podcast"))
+
+        manager.setScanning(true, podcastUuid: "podcast")
+        XCTAssertTrue(manager.isScanning(podcastUuid: "podcast"))
     }
 }
 

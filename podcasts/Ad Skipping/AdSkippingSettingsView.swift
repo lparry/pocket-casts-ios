@@ -19,7 +19,8 @@ struct AdSkippingSettingsView: View {
             limitsSection
             openRouterSection
             Section {
-                Button(L10n.adScanningTitle, action: showAdScanning)
+                // The settings screen is called Ad Zapping too, so this names what it opens
+                Button(L10n.adSkippingAnalysesHeader, action: showAdScanning)
             }
         }
         .miniPlayerSafeAreaInset()

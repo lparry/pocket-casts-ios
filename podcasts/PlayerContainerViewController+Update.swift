@@ -27,11 +27,15 @@ extension PlayerContainerViewController {
         tabsView.themeDidChange()
 
         let shouldShowNotes = (playingEpisode is Episode)
+        // Ads are only found in downloads, so a streamed episode has nothing to show
+        let shouldShowAdZapping = FeatureFlag.autoAdSkip.enabled
+            && DataManager.shared.findBaseEpisode(uuid: playingEpisode.uuid)?.downloaded(pathFinder: DownloadManager.shared) == true
         let shouldShowChapters = PlaybackManager.shared.chapterCount() > 0
         let shouldShowBookmarks = true
 
         // check to see if the visible views are already configured correctly
         if shouldShowNotes == showingNotes,
+            shouldShowAdZapping == showingAdZapping,
             shouldShowChapters == showingChapters,
             shouldShowBookmarks == showingBookmarks {
             return
@@ -42,6 +46,10 @@ extension PlayerContainerViewController {
         showNotesItem.removeFromParent()
         showNotesItem.view.removeFromSuperview()
         showingNotes = false
+
+        adZappingItem.removeFromParent()
+        adZappingItem.view.removeFromSuperview()
+        showingAdZapping = false
 
         chaptersItem.removeFromParent()
         chaptersItem.view.removeFromSuperview()
@@ -60,6 +68,13 @@ extension PlayerContainerViewController {
             tabsView.tabs += [.showNotes]
 
             addTab(showNotesItem, previousTab: &previousTab)
+        }
+
+        if shouldShowAdZapping {
+            showingAdZapping = true
+            tabsView.tabs += [.adZapping]
+
+            addTab(adZappingItem, previousTab: &previousTab)
         }
 
         if shouldShowChapters {

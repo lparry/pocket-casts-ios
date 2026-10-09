@@ -6694,17 +6694,17 @@
 /* Message shown when a network the user tapped fails to load */
 "network_fail_to_load" = "This network couldn't be loaded";
 
-/* Toast shown when playback automatically skips past an ad in the episode */
-"ad_skipping_skipped" = "Skipped ad";
+/* Toast shown when Ad Zapping automatically skips past an ad in the episode */
+"ad_skipping_skipped" = "Zapped an ad";
 
 /* Toast shown when playback automatically skips past several ads in a row. %1$@ is the number of ads */
-"ad_skipping_skipped_plural" = "Skipped %1$@ ads";
+"ad_skipping_skipped_plural" = "Zapped %1$@ ads";
 
 /* Button on the skipped ad toast that goes back and plays the ad */
 "ad_skipping_undo" = "Undo";
 
-/* Title of the settings screen, and its row, for automatically skipping ads */
-"ad_skipping_title" = "Ad Skipping";
+/* Title of the settings screen and its row, and of the player tab, for the Ad Zapping feature, which finds ads and skips them automatically. Ad Zapping is the feature's name */
+"ad_skipping_title" = "Ad Zapping";
 
 /* Header above the OpenRouter API key and model fields on the ad skipping settings screen. OpenRouter is a product name */
 "ad_skipping_api_key_header" = "OpenRouter";
@@ -6731,7 +6731,7 @@
 "ad_skipping_classifier_active" = "Finding ads with %1$@";
 
 /* Explains how ad finding works and the on-device fallback */
-"ad_skipping_classifier_footer" = "Downloaded episodes are transcribed on device, and OpenRouter finds the ads. If an OpenRouter request fails, Apple Intelligence on this device is tried instead.";
+"ad_skipping_classifier_footer" = "Ad Zapping transcribes downloaded episodes on your phone, then OpenRouter finds the ads. If an OpenRouter request fails, Apple Intelligence on this device is tried instead.";
 
 /* Name for finding ads with Apple Intelligence on the device */
 "ad_skipping_classifier_on_device" = "On device";
@@ -6743,7 +6743,7 @@
 "ad_skipping_analyses_header" = "Downloaded Episodes";
 
 /* Shown on the ad skipping settings screen when nothing is downloaded */
-"ad_skipping_no_downloads" = "Download an episode to find its ads";
+"ad_skipping_no_downloads" = "Download an episode to zap its ads";
 
 /* Button that scans every downloaded episode that hasn't had its ads found, including ones that failed */
 "ad_skipping_scan_all" = "Scan All";
@@ -6787,8 +6787,8 @@
 /* Status when finding the ads failed. %1$@ is the error message */
 "ad_skipping_status_failed" = "Failed: %1$@";
 
-/* Header above the switches for which kinds of ad to skip */
-"ad_skipping_kinds_header" = "Skip";
+/* Header above the switches for which kinds of ad Ad Zapping skips */
+"ad_skipping_kinds_header" = "Zap";
 
 /* Explains that the ad kind switches apply straight away */
 "ad_skipping_kinds_footer" = "Ads that are already found keep their kind, so changes apply straight away.";
@@ -6805,17 +6805,17 @@
 /* Kind of ad: the show asking for support, reviews, memberships or merch */
 "ad_skipping_kind_self_promo" = "Self-promotion";
 
-/* Switch in a podcast's settings that turns finding and skipping ads on or off for that podcast */
-"ad_skipping_scan_for_ads" = "Scan for Ads";
+/* Switch in a podcast's settings that turns Ad Zapping, which finds and skips ads, on or off for that podcast */
+"ad_skipping_scan_for_ads" = "Ad Zapping";
 
 /* Status of a downloaded episode whose podcast has Scan for Ads turned off */
-"ad_skipping_status_off_for_podcast" = "Off for this podcast";
+"ad_skipping_status_off_for_podcast" = "Ad Zapping is off for this podcast";
 
-/* Title of the screen, and the Profile and settings rows that open it, listing downloaded episodes and whether their ads have been found */
-"ad_scanning_title" = "Ad Scanning";
+/* Title of the screen, and the Profile row that opens it, listing downloaded episodes and what Ad Zapping found in them */
+"ad_scanning_title" = "Ad Zapping";
 
 /* Status of an episode where so many ads were found that the result can't be right, so none are skipped. %1$@ is the number of ads and %2$@ is their total length, like 12:30 */
-"ad_skipping_status_suspect" = "Looks wrong, not skipping: %1$@ ads · %2$@";
+"ad_skipping_status_suspect" = "Looks wrong, not zapping: %1$@ ads · %2$@";
 
 /* How long an episode took to transcribe. %1$@ is the length of the audio, like 26:00, %2$@ is how long it took, like 1:12, and %3$@ is how many times faster than real time that was, like 21.7 */
 "ad_scanning_timings_transcribed" = "Transcribed %1$@ of audio in %2$@ (%3$@× real time)";

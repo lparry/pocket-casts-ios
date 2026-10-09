@@ -714,11 +714,11 @@ final class TranscriptStoreTests: XCTestCase {
 
 final class AdScanTimingsTests: XCTestCase {
     func testShowsStepsUnderAMinuteInSeconds() {
-        XCTAssertTrue(AdScanningView.formatTimeTaken(0.04).contains("0"))
-        XCTAssertFalse(AdScanningView.formatTimeTaken(0.4).contains(":"), "Not rounded to 0:00")
-        XCTAssertTrue(AdScanningView.formatTimeTaken(0.4).contains("0.4"))
-        XCTAssertTrue(AdScanningView.formatTimeTaken(12.3).contains("12"))
-        XCTAssertTrue(AdScanningView.formatTimeTaken(65).contains(":"))
+        XCTAssertTrue(AdZappingDetails.formatTimeTaken(0.04).contains("0"))
+        XCTAssertFalse(AdZappingDetails.formatTimeTaken(0.4).contains(":"), "Not rounded to 0:00")
+        XCTAssertTrue(AdZappingDetails.formatTimeTaken(0.4).contains("0.4"))
+        XCTAssertTrue(AdZappingDetails.formatTimeTaken(12.3).contains("12"))
+        XCTAssertTrue(AdZappingDetails.formatTimeTaken(65).contains(":"))
     }
 
     func testReadsTimingsSavedBeforeEdgesWereCounted() throws {

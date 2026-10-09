@@ -16,6 +16,7 @@ struct AdSkippingSettingsView: View {
         List {
             classifierSection
             kindsSection
+            limitsSection
             openRouterSection
             Section {
                 Button(L10n.adScanningTitle, action: showAdScanning)
@@ -59,6 +60,28 @@ struct AdSkippingSettingsView: View {
             Text(L10n.adSkippingKindsHeader)
         } footer: {
             Text(L10n.adSkippingKindsFooter)
+        }
+    }
+
+    // MARK: - Limits
+
+    private var limitsSection: some View {
+        Section {
+            Picker(L10n.adSkippingUpNextLimit, selection: Binding(
+                get: { manager.upNextLimit ?? 0 },
+                set: { manager.upNextLimit = $0 > 0 ? $0 : nil }
+            )) {
+                ForEach(AdSkippingManager.upNextLimitOptions, id: \.self) { limit in
+                    Text(limit == 1 ? L10n.adSkippingUpNextLimitSingular : L10n.adSkippingUpNextLimitPlural(limit.localized()))
+                        .tag(limit)
+                }
+                Text(L10n.adSkippingUpNextLimitAll)
+                    .tag(0)
+            }
+        } header: {
+            Text(L10n.adSkippingLimitsHeader)
+        } footer: {
+            Text(L10n.adSkippingLimitsFooter)
         }
     }
 
@@ -124,6 +147,10 @@ extension AdSkippingManager.Status: CustomStringConvertible {
             L10n.adSkippingStatusFinished(adCount.localized(), AdSkippingSettingsView.displayName(forClassifier: classifier))
         case .failed(let message):
             L10n.adSkippingStatusFailed(message)
+        case .waitingForUpNext:
+            L10n.adSkippingStatusWaitingForUpNext
+        case .waitingForPower:
+            L10n.adSkippingStatusWaitingForPower
         }
     }
 }

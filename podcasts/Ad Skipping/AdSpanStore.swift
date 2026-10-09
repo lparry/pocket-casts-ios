@@ -145,31 +145,82 @@ final class TranscriptStore {
 
     /// The saved transcript, if it was made from a file of this size in the current format
     func transcript(for episodeUuid: String, audioFileSize: UInt64?) -> (segments: [TranscriptSegment], audioDuration: TimeInterval?)? {
-        guard let data = try? Data(contentsOf: fileURL(for: episodeUuid)),
+        if let stored = load(fileURL(for: episodeUuid, audioFileSize: audioFileSize), audioFileSize: audioFileSize) {
+            return (stored.segments, stored.audioDuration)
+        }
+
+        // Transcripts used to be saved without the file size in their name, so move a matching one across
+        let legacyURL = legacyFileURL(for: episodeUuid)
+        guard let stored = load(legacyURL, audioFileSize: audioFileSize) else { return nil }
+        try? fileManager.moveItem(at: legacyURL, to: fileURL(for: episodeUuid, audioFileSize: audioFileSize))
+        return (stored.segments, stored.audioDuration)
+    }
+
+    /// Whether there's a transcript for a file of this size, without reading it. One saved before the size was in its
+    /// name counts, and is checked properly when it's read.
+    func hasTranscript(for episodeUuid: String, audioFileSize: UInt64?) -> Bool {
+        fileManager.fileExists(atPath: fileURL(for: episodeUuid, audioFileSize: audioFileSize).path)
+            || fileManager.fileExists(atPath: legacyFileURL(for: episodeUuid).path)
+    }
+
+    func save(_ segments: [TranscriptSegment], for episodeUuid: String, audioFileSize: UInt64?, audioDuration: TimeInterval?) throws {
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let stored = StoredTranscript(formatVersion: Self.formatVersion, audioFileSize: audioFileSize, audioDuration: audioDuration, segments: segments)
+        let url = fileURL(for: episodeUuid, audioFileSize: audioFileSize)
+        try JSONEncoder().encode(stored).write(to: url, options: .atomic)
+
+        // Only the transcript of the file on disk is any use
+        for file in files() where Self.episodeUuid(of: file) == episodeUuid && file.lastPathComponent != url.lastPathComponent {
+            try? fileManager.removeItem(at: file)
+        }
+    }
+
+    /// Deletes the transcripts of episodes that aren't downloaded any more
+    func removeAll(except episodeUuids: Set<String>) {
+        for file in files() where !episodeUuids.contains(Self.episodeUuid(of: file)) {
+            try? fileManager.removeItem(at: file)
+        }
+    }
+
+    /// Renames transcripts saved before the file size was in their name, so `hasTranscript` can tell which file they're for
+    func migrateLegacyFiles() {
+        for file in files() where !file.deletingPathExtension().lastPathComponent.contains(".") {
+            let episodeUuid = Self.episodeUuid(of: file)
+            if let data = try? Data(contentsOf: file), let stored = try? JSONDecoder().decode(StoredTranscript.self, from: data) {
+                try? fileManager.moveItem(at: file, to: fileURL(for: episodeUuid, audioFileSize: stored.audioFileSize))
+            } else {
+                try? fileManager.removeItem(at: file)
+            }
+        }
+    }
+
+    private func load(_ url: URL, audioFileSize: UInt64?) -> StoredTranscript? {
+        guard let data = try? Data(contentsOf: url),
               let stored = try? JSONDecoder().decode(StoredTranscript.self, from: data),
               stored.formatVersion == Self.formatVersion,
               stored.audioFileSize == audioFileSize
         else {
             return nil
         }
-        return (stored.segments, stored.audioDuration)
+        return stored
     }
 
-    func save(_ segments: [TranscriptSegment], for episodeUuid: String, audioFileSize: UInt64?, audioDuration: TimeInterval?) throws {
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let stored = StoredTranscript(formatVersion: Self.formatVersion, audioFileSize: audioFileSize, audioDuration: audioDuration, segments: segments)
-        try JSONEncoder().encode(stored).write(to: fileURL(for: episodeUuid), options: .atomic)
-    }
-
-    /// Deletes the transcripts of episodes that aren't downloaded any more
-    func removeAll(except episodeUuids: Set<String>) {
+    private func files() -> [URL] {
         let files = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-        for file in files where file.pathExtension == "json" && !episodeUuids.contains(file.deletingPathExtension().lastPathComponent) {
-            try? fileManager.removeItem(at: file)
-        }
+        return files.filter { $0.pathExtension == "json" }
     }
 
-    private func fileURL(for episodeUuid: String) -> URL {
+    /// Files are named `uuid.size.json`, or `uuid.json` from before the size was included
+    private static func episodeUuid(of file: URL) -> String {
+        let name = file.deletingPathExtension().lastPathComponent
+        return name.split(separator: ".", maxSplits: 1).first.map(String.init) ?? name
+    }
+
+    private func fileURL(for episodeUuid: String, audioFileSize: UInt64?) -> URL {
+        directory.appendingPathComponent("\(episodeUuid).\(audioFileSize.map(String.init) ?? "unknown")").appendingPathExtension("json")
+    }
+
+    private func legacyFileURL(for episodeUuid: String) -> URL {
         directory.appendingPathComponent(episodeUuid).appendingPathExtension("json")
     }
 }

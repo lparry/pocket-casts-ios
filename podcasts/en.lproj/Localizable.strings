@@ -6826,6 +6826,30 @@
 /* How long the rest of a scan took. %1$@ is finding the ads, %2$@ is placing their edges on exact words, and %3$@ is lining the edges up with the audio, each like 0:08 */
 "ad_scanning_timings_steps" = "Finding ads %1$@ · Edges %2$@ · Audio %3$@";
 
+/* Header of the ad skipping settings section that limits which downloads are scanned, to keep down the cost and battery use */
+"ad_skipping_limits_header" = "Limits";
+
+/* Footer of the ad skipping limits section, explaining what the Up Next setting above it does */
+"ad_skipping_limits_footer" = "Ads are found in the episode that's playing and the ones at the top of Up Next, since finding them costs money. Other downloads are transcribed on your phone while it's charging, ready for when they move up. On battery, only episodes about to be scanned are transcribed, and none in Low Power Mode.";
+
+/* Label of the setting choosing how many episodes at the top of Up Next have their ads found */
+"ad_skipping_up_next_limit" = "Find Ads In";
+
+/* Option for the ad scanning Up Next setting: only the next episode in Up Next, as well as the one playing */
+"ad_skipping_up_next_limit_singular" = "Next Episode";
+
+/* Option for the ad scanning Up Next setting: this many episodes at the top of Up Next, as well as the one playing. %1$@ is the number, like 3 */
+"ad_skipping_up_next_limit_plural" = "Next %1$@ Episodes";
+
+/* Option for the ad scanning Up Next setting: find the ads in every downloaded episode */
+"ad_skipping_up_next_limit_all" = "All Downloads";
+
+/* Status of a downloaded episode that's been transcribed, but whose ads won't be found until it's near the top of Up Next */
+"ad_skipping_status_waiting_for_up_next" = "Transcribed, waiting for Up Next";
+
+/* Status of a downloaded episode that won't be transcribed until the phone is charging */
+"ad_skipping_status_waiting_for_power" = "Waiting for charging to transcribe";
+
 /* Accessibility label for the button that plays an episode from just before an ad that was found, without skipping it */
 "ad_scanning_play_ad" = "Play this ad";
 

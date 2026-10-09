@@ -191,7 +191,7 @@ struct AdScanningView: View {
 
             if manager.isScanning(episode), !isInProgress(episode) {
                 Button(analysis == nil ? L10n.adSkippingScan : L10n.adSkippingRescan) {
-                    manager.enqueue(episode.uuid, force: true, first: true)
+                    manager.enqueue(episode.uuid, force: true, first: true, requested: true)
                 }
                 .buttonStyle(.borderless)
             }

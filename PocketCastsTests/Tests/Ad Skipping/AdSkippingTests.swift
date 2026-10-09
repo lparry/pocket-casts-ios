@@ -677,6 +677,86 @@ final class TranscriptStoreTests: XCTestCase {
         XCTAssertNotNil(store.transcript(for: "kept", audioFileSize: 100))
         XCTAssertNil(store.transcript(for: "deleted", audioFileSize: 100))
     }
+
+    func testKnowsWhichFileWasTranscribedWithoutReadingIt() throws {
+        let store = TranscriptStore(directory: directory)
+        try store.save(transcript, for: "episode", audioFileSize: 100, audioDuration: 1)
+
+        XCTAssertTrue(store.hasTranscript(for: "episode", audioFileSize: 100))
+        XCTAssertFalse(store.hasTranscript(for: "episode", audioFileSize: 200))
+        XCTAssertFalse(store.hasTranscript(for: "other", audioFileSize: 100))
+    }
+
+    func testOnlyKeepsTheTranscriptOfTheLatestDownload() throws {
+        let store = TranscriptStore(directory: directory)
+        try store.save(transcript, for: "episode", audioFileSize: 100, audioDuration: 1)
+        try store.save(transcript, for: "episode", audioFileSize: 200, audioDuration: 1)
+
+        XCTAssertFalse(store.hasTranscript(for: "episode", audioFileSize: 100))
+        XCTAssertNotNil(store.transcript(for: "episode", audioFileSize: 200))
+    }
+
+    func testMovesTranscriptsSavedWithoutTheFileSizeInTheirName() throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let legacy: [String: Any] = ["formatVersion": TranscriptStore.formatVersion, "audioFileSize": 100, "audioDuration": 1, "segments": [["start": 0, "end": 1, "text": "Hello there.", "words": []]]]
+        try JSONSerialization.data(withJSONObject: legacy).write(to: directory.appendingPathComponent("episode.json"))
+        try Data("not a transcript".utf8).write(to: directory.appendingPathComponent("broken.json"))
+
+        let store = TranscriptStore(directory: directory)
+        store.migrateLegacyFiles()
+
+        XCTAssertTrue(store.hasTranscript(for: "episode", audioFileSize: 100))
+        XCTAssertFalse(store.hasTranscript(for: "episode", audioFileSize: 200))
+        XCTAssertEqual(store.transcript(for: "episode", audioFileSize: 100)?.segments.first?.text, "Hello there.")
+        XCTAssertFalse(store.hasTranscript(for: "broken", audioFileSize: nil))
+    }
+}
+
+final class AdScanLimitTests: XCTestCase {
+    private let charging = AdSkippingManager.ScanConditions(isCharging: true, isLowPowerMode: false, isHot: false)
+    private let onBattery = AdSkippingManager.ScanConditions(isCharging: false, isLowPowerMode: false, isHot: false)
+    private let lowPower = AdSkippingManager.ScanConditions(isCharging: false, isLowPowerMode: true, isHot: false)
+    private let hot = AdSkippingManager.ScanConditions(isCharging: true, isLowPowerMode: false, isHot: true)
+
+    func testWindowIsThePlayingEpisodeAndTheTopOfUpNext() {
+        XCTAssertEqual(AdSkippingManager.detectionWindow(nowPlaying: "playing", upNext: ["a", "b", "c", "d"], limit: 3), ["playing", "a", "b", "c"])
+        XCTAssertEqual(AdSkippingManager.detectionWindow(nowPlaying: nil, upNext: ["a", "b"], limit: 3), ["a", "b"])
+        XCTAssertNil(AdSkippingManager.detectionWindow(nowPlaying: "playing", upNext: ["a"], limit: nil), "All downloads")
+    }
+
+    func testFindsAdsInTheWindowOnBattery() {
+        XCTAssertEqual(plan(inWindow: true, hasTranscript: false, conditions: onBattery), .full)
+        XCTAssertEqual(plan(inWindow: true, hasTranscript: true, conditions: onBattery), .full)
+    }
+
+    func testOnlyTranscribesOutsideTheWindowWhileCharging() {
+        XCTAssertEqual(plan(inWindow: false, hasTranscript: false, conditions: charging), .transcribeOnly)
+        XCTAssertEqual(plan(inWindow: false, hasTranscript: false, conditions: onBattery), .waitingForPower)
+        XCTAssertEqual(plan(inWindow: false, hasTranscript: true, conditions: charging), .waitingForUpNext)
+        XCTAssertEqual(plan(inWindow: false, hasTranscript: true, conditions: onBattery), .waitingForUpNext)
+    }
+
+    func testDoesntTranscribeInLowPowerModeOrWhenHot() {
+        XCTAssertEqual(plan(inWindow: true, hasTranscript: false, conditions: lowPower), .waitingForPower)
+        XCTAssertEqual(plan(inWindow: true, hasTranscript: false, conditions: hot), .waitingForPower)
+        XCTAssertEqual(plan(inWindow: false, hasTranscript: false, conditions: hot), .waitingForPower)
+        XCTAssertEqual(plan(inWindow: true, hasTranscript: true, conditions: lowPower), .full, "Finding ads in a saved transcript needs no transcribing")
+    }
+
+    func testScanningEverythingWithoutAWindow() {
+        let inWindow = AdSkippingManager.detectionWindow(nowPlaying: nil, upNext: [], limit: nil)?.contains("anything") ?? true
+        XCTAssertEqual(plan(inWindow: inWindow, hasTranscript: false, conditions: onBattery), .full)
+    }
+
+    func testAScanTheListenerAskedForIgnoresTheLimits() {
+        for conditions in [charging, onBattery, lowPower, hot] {
+            XCTAssertEqual(AdSkippingManager.scanPlan(requested: true, inDetectionWindow: false, hasTranscript: false, conditions: conditions), .full)
+        }
+    }
+
+    private func plan(inWindow: Bool, hasTranscript: Bool, conditions: AdSkippingManager.ScanConditions) -> AdSkippingManager.ScanPlan {
+        AdSkippingManager.scanPlan(requested: false, inDetectionWindow: inWindow, hasTranscript: hasTranscript, conditions: conditions)
+    }
 }
 
 final class AdScanFailureTests: XCTestCase {

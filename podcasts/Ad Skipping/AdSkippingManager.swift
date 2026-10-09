@@ -10,7 +10,9 @@ import UIKit
 /// Finds the ads in downloaded episodes and tells playback which ones to skip.
 ///
 /// Every downloaded episode is scanned once for each file it's downloaded as: when a download
-/// finishes, and as a backfill whenever the app launches or comes to the foreground. A background
+/// finishes, and as a backfill whenever the app launches or comes to the foreground. Finding ads costs
+/// money, so it waits until an episode is playing or near the top of Up Next (see `upNextLimit`), and
+/// transcribing costs battery, so downloads further down are only transcribed while charging. A background
 /// processing task carries on with the queue while the device is charging. The local file is
 /// transcribed on device and the timestamped transcript goes to an `AdClassifier`: OpenRouter, with
 /// the listener's own key, falling back to Apple's on-device model only if OpenRouter's answer can't be used.
@@ -30,6 +32,28 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         case classifying
         case finished(adCount: Int, classifier: String)
         case failed(String)
+        /// Transcribed, but not near enough the top of Up Next to pay for finding its ads yet
+        case waitingForUpNext
+        /// Not transcribed, and the phone isn't charging, or is too hot or in Low Power Mode
+        case waitingForPower
+    }
+
+    /// What a scan of one download should do now
+    enum ScanPlan: Equatable {
+        /// Transcribe if needed, then find the ads
+        case full
+        /// Transcribe ahead of time, and find the ads once it's near the top of Up Next
+        case transcribeOnly
+        case waitingForUpNext
+        case waitingForPower
+    }
+
+    /// The state of the phone that decides when transcribing is worth the battery
+    struct ScanConditions: Equatable {
+        var isCharging: Bool
+        var isLowPowerMode: Bool
+        /// The thermal state is serious or critical
+        var isHot: Bool
     }
 
     /// The status of each episode queued since launch
@@ -65,6 +89,15 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     /// Set when a background task runs out of time, so nothing new starts until the app is next active
     @MainActor
     private var isPaused = false
+    /// Episodes the listener asked to scan, which ignore the Up Next and battery limits
+    @MainActor
+    private var requested: Set<String> = []
+    /// What the episode being processed is being scanned for
+    @MainActor
+    private var processingPlan: ScanPlan?
+    /// Waits for Up Next or the power state to settle before looking for what to scan
+    @MainActor
+    private var rescanTask: Task<Void, Never>?
 
     private struct PlaybackState {
         /// Spans the listener chose to hear with Undo, keyed by episode, so they aren't skipped again this session
@@ -110,6 +143,17 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         NotificationCenter.default.addObserver(self, selector: #selector(episodeDownloaded(_:)), name: Constants.Notifications.episodeDownloaded, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(didBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(didEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+
+        // What's near the top of Up Next and whether the phone is charging decide what's scanned
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        for name in [Constants.Notifications.upNextQueueChanged, UIDevice.batteryStateDidChangeNotification, Notification.Name.NSProcessInfoPowerStateDidChange, ProcessInfo.thermalStateDidChangeNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(scanConditionsChanged), name: name, object: nil)
+        }
+
+        let transcriptStore = transcriptStore
+        Task.detached(priority: .utility) {
+            transcriptStore.migrateLegacyFiles()
+        }
 
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.backgroundTaskIdentifier, using: .main) { [weak self] task in
             guard let self, let task = task as? BGProcessingTask else { return }
@@ -188,6 +232,103 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         }
         retryableFailures.removeAll()
         scanMissing()
+    }
+
+    // MARK: - Limits
+
+    private static let upNextLimitDefaultsKey = "AdSkippingUpNextLimit"
+    static let defaultUpNextLimit = 3
+    static let upNextLimitOptions = [1, 3, 5, 10]
+
+    /// How many episodes at the top of Up Next have their ads found, as well as the one playing, or nil for every download.
+    /// Downloads outside it are only transcribed, and only while charging, so a long list of downloads costs nothing.
+    @MainActor
+    var upNextLimit: Int? {
+        get {
+            guard let limit = UserDefaults.standard.object(forKey: Self.upNextLimitDefaultsKey) as? Int else { return Self.defaultUpNextLimit }
+            return limit > 0 ? limit : nil
+        }
+        set {
+            UserDefaults.standard.set(newValue ?? 0, forKey: Self.upNextLimitDefaultsKey)
+            objectWillChange.send()
+            scanMissing()
+        }
+    }
+
+    /// The episodes whose ads are found automatically: the one playing and the first `limit` of Up Next, or nil for all
+    static func detectionWindow(nowPlaying: String?, upNext: [String], limit: Int?) -> Set<String>? {
+        guard let limit else { return nil }
+        return Set([nowPlaying].compactMap { $0 } + upNext.prefix(limit))
+    }
+
+    /// Finding ads costs money, so it only happens in the detection window. Transcribing costs battery, so it happens for any
+    /// download while charging, but on battery only for the window, and never when the phone is hot or in Low Power Mode.
+    /// A scan the listener asked for ignores all of this.
+    static func scanPlan(requested: Bool, inDetectionWindow: Bool, hasTranscript: Bool, conditions: ScanConditions) -> ScanPlan {
+        if requested {
+            return .full
+        }
+
+        let canTranscribe = !conditions.isHot && (conditions.isCharging || (inDetectionWindow && !conditions.isLowPowerMode))
+        if inDetectionWindow {
+            return hasTranscript || canTranscribe ? .full : .waitingForPower
+        }
+        if hasTranscript {
+            return .waitingForUpNext
+        }
+        return canTranscribe ? .transcribeOnly : .waitingForPower
+    }
+
+    @MainActor
+    static func currentConditions() -> ScanConditions {
+        let batteryState = UIDevice.current.batteryState
+        return ScanConditions(isCharging: batteryState == .charging || batteryState == .full,
+                              isLowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                              isHot: ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue)
+    }
+
+    @MainActor
+    private func currentDetectionWindow() -> Set<String>? {
+        guard let limit = upNextLimit else { return nil }
+
+        let playbackManager = PlaybackManager.shared
+        return Self.detectionWindow(nowPlaying: playbackManager.currentEpisode?.uuid,
+                                    upNext: playbackManager.queue.allEpisodes(includeNowPlaying: false).map(\.uuid),
+                                    limit: limit)
+    }
+
+    @MainActor
+    private func scanPlan(for episode: BaseEpisode, window: Set<String>?, conditions: ScanConditions) -> ScanPlan {
+        Self.scanPlan(requested: requested.contains(episode.uuid),
+                      inDetectionWindow: window?.contains(episode.uuid) ?? true,
+                      hasTranscript: transcriptStore.hasTranscript(for: episode.uuid, audioFileSize: Self.fileSize(of: episode)),
+                      conditions: conditions)
+    }
+
+    /// Up Next, charging, Low Power Mode and the thermal state can all change often, and from any thread
+    @objc private func scanConditionsChanged() {
+        Task { @MainActor in
+            self.rescanTask?.cancel()
+            self.rescanTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+
+                self.stopTranscribingIfNoLongerAllowed()
+                self.scanMissing()
+            }
+        }
+    }
+
+    /// Stops transcribing ahead of time when the phone comes off the charger, so the battery isn't used for it
+    @MainActor
+    private func stopTranscribingIfNoLongerAllowed() {
+        guard processingPlan == .transcribeOnly, let uuid = processingUuid, let episode = dataManager.findBaseEpisode(uuid: uuid) else { return }
+
+        let plan = scanPlan(for: episode, window: currentDetectionWindow(), conditions: Self.currentConditions())
+        if plan != .transcribeOnly, plan != .full {
+            FileLog.shared.addMessage("AdSkipping: stopped transcribing \(uuid) ahead of time, since the phone isn't charging")
+            processingTask?.cancel()
+        }
     }
 
     // MARK: - Kinds
@@ -354,14 +495,18 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     }
 
     /// Queues an episode for scanning. Without `force`, episodes already scanned for the file on disk are skipped.
+    /// A scan the listener asked for is `requested`, and ignores the Up Next and battery limits.
     @MainActor
-    func enqueue(_ episodeUuid: String, force: Bool = false, first: Bool = false) {
+    func enqueue(_ episodeUuid: String, force: Bool = false, first: Bool = false, requested isRequested: Bool = false) {
         guard FeatureFlag.autoAdSkip.enabled, processingUuid != episodeUuid else { return }
         guard let episode = dataManager.findBaseEpisode(uuid: episodeUuid), isScanning(episode) else { return }
         guard force || (currentAnalysis(for: episode) == nil && !hasKnownFailure(episode, classifiers: Self.classifiersKey(classifiers))) else { return }
 
         pending.removeAll { $0 == episodeUuid }
         retryableFailures.remove(episodeUuid)
+        if isRequested {
+            requested.insert(episodeUuid)
+        }
         if first {
             pending.insert(episodeUuid, at: 0)
         } else {
@@ -371,7 +516,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         processNextIfNeeded()
     }
 
-    /// Queues every downloaded episode that hasn't been scanned for the file on disk, playing and Up Next first.
+    /// Queues every downloaded episode that hasn't been scanned for the file on disk, playing and Up Next first, as far as
+    /// the Up Next and battery limits allow. The rest are marked as waiting.
     ///
     /// A permanent failure isn't tried again, even after a relaunch, until the file or the classifiers change, so a transcript
     /// that can't be classified isn't sent and paid for over and over. `enqueue` with `force` still tries it on request.
@@ -392,22 +538,38 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         let classifiersKey = Self.classifiersKey(classifiers)
         let episodes = downloaded.filter { isScanning($0) }
+        let episodesByUuid = Dictionary(episodes.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
         let skipped = Set(episodes.filter { currentAnalysis(for: $0) != nil || hasKnownFailure($0, classifiers: classifiersKey) }.map(\.uuid))
         let upNext = PlaybackManager.shared.queue.allEpisodes(includeNowPlaying: true).map(\.uuid)
         let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: upNext)
+        let window = currentDetectionWindow()
+        let conditions = Self.currentConditions()
 
-        let toScan = ordered.filter { uuid in
-            guard uuid != processingUuid, !skipped.contains(uuid) else { return false }
-            if case .failed = statuses[uuid] {
-                return retryableFailures.contains(uuid)
+        // Collected and published once, since there can be hundreds of downloads
+        var newStatuses = statuses
+        var toScan: [String] = []
+        for uuid in ordered {
+            guard uuid != processingUuid, !skipped.contains(uuid), let episode = episodesByUuid[uuid] else { continue }
+            if case .failed = statuses[uuid], !retryableFailures.contains(uuid) {
+                continue
             }
-            return true
-        }
-        guard !toScan.isEmpty else { return }
 
-        pending = toScan + pending.filter { !toScan.contains($0) }
-        for uuid in toScan {
-            statuses[uuid] = .queued
+            switch scanPlan(for: episode, window: window, conditions: conditions) {
+            case .full, .transcribeOnly:
+                toScan.append(uuid)
+                newStatuses[uuid] = .queued
+            case .waitingForUpNext:
+                newStatuses[uuid] = .waitingForUpNext
+            case .waitingForPower:
+                newStatuses[uuid] = .waitingForPower
+            }
+        }
+
+        let toScanSet = Set(toScan)
+        let waiting = Set(newStatuses.filter { $0.value == .waitingForUpNext || $0.value == .waitingForPower }.keys)
+        pending = toScan + pending.filter { !toScanSet.contains($0) && !waiting.contains($0) }
+        if newStatuses != statuses {
+            statuses = newStatuses
         }
         processNextIfNeeded()
     }
@@ -529,8 +691,23 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func process(_ uuid: String) async {
+        // Decided now rather than when queued, since Up Next and the battery may have changed since
+        let plan = dataManager.findBaseEpisode(uuid: uuid).map { scanPlan(for: $0, window: currentDetectionWindow(), conditions: Self.currentConditions()) } ?? .full
+        switch plan {
+        case .waitingForUpNext:
+            statuses[uuid] = .waitingForUpNext
+            return
+        case .waitingForPower:
+            statuses[uuid] = .waitingForPower
+            return
+        case .full, .transcribeOnly:
+            break
+        }
+
+        processingPlan = plan
         beginBackgroundTask()
         defer {
+            processingPlan = nil
             endBackgroundTask()
         }
 
@@ -541,16 +718,28 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let fileSize = dataManager.findBaseEpisode(uuid: uuid).flatMap { Self.fileSize(of: $0) }
 
         do {
-            let (spans, classifier) = try await analyze(uuid)
-            failureStore.remove(uuid)
-            statuses[uuid] = .finished(adCount: spans.count, classifier: classifier)
-            FileLog.shared.addMessage("AdSkipping: \(classifier) found \(spans.count) ads in \(uuid)")
+            if let result = try await analyze(uuid, findingAds: plan == .full) {
+                failureStore.remove(uuid)
+                statuses[uuid] = .finished(adCount: result.spans.count, classifier: result.classifier)
+                FileLog.shared.addMessage("AdSkipping: \(result.classifier) found \(result.spans.count) ads in \(uuid)")
+            } else {
+                FileLog.shared.addMessage("AdSkipping: transcribed \(uuid) ahead of time")
+                // It may have moved up Up Next while it was being transcribed
+                if let episode = dataManager.findBaseEpisode(uuid: uuid), scanPlan(for: episode, window: currentDetectionWindow(), conditions: Self.currentConditions()) == .full {
+                    pending.insert(uuid, at: 0)
+                    statuses[uuid] = .queued
+                } else {
+                    statuses[uuid] = .waitingForUpNext
+                }
+            }
+            requested.remove(uuid)
         } catch where Task.isCancelled {
             // Interrupted, not failed, so pick it up again next time
             pending.insert(uuid, at: 0)
             statuses[uuid] = .queued
             FileLog.shared.addMessage("AdSkipping: interrupted while scanning \(uuid)")
         } catch {
+            requested.remove(uuid)
             statuses[uuid] = .failed(error.localizedDescription)
             if AdSkippingError.isRetryable(error) {
                 retryableFailures.insert(uuid)
@@ -588,8 +777,9 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         backgroundTaskId = .invalid
     }
 
+    /// Transcribes the episode if it hasn't been, then finds its ads unless it's only `findingAds` later, returning nil
     @MainActor
-    private func analyze(_ uuid: String) async throws -> (spans: [AdSpan], classifier: String) {
+    private func analyze(_ uuid: String, findingAds: Bool) async throws -> (spans: [AdSpan], classifier: String)? {
         guard let episode = dataManager.findBaseEpisode(uuid: uuid), episode.downloaded(pathFinder: DownloadManager.shared) else {
             throw AdSkippingError.notDownloaded
         }
@@ -632,6 +822,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         guard !transcript.isEmpty else {
             throw AdSkippingError.emptyTranscript
         }
+
+        guard findingAds else { return nil }
 
         statuses[uuid] = .classifying
         let podcastTitle = (episode as? Episode)?.parentPodcast(dataManager: dataManager)?.title
@@ -739,7 +931,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func scheduleBackgroundScanningIfNeeded() {
-        guard processingUuid != nil || !pending.isEmpty else { return }
+        // Downloads waiting for power are transcribed by the task, which only runs while charging
+        guard processingUuid != nil || !pending.isEmpty || statuses.values.contains(.waitingForPower) else { return }
 
         // Transcription is heavy, so only carry on in the background while charging
         let request = BGProcessingTaskRequest(identifier: Self.backgroundTaskIdentifier)

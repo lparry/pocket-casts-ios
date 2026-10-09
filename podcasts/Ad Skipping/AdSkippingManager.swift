@@ -42,6 +42,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     let store: AdSpanStore
     private let transcriptStore: TranscriptStore
+    private let failureStore: AdScanFailureStore
 
     private let transcriberProvider: () -> EpisodeTranscriber?
     private let classifiersProvider: (_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier]
@@ -83,11 +84,13 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     init(store: AdSpanStore = AdSpanStore(),
          transcriptStore: TranscriptStore = TranscriptStore(),
+         failureStore: AdScanFailureStore = AdScanFailureStore(),
          dataManager: DataManager = .shared,
          transcriberProvider: (() -> EpisodeTranscriber?)? = nil,
          classifiersProvider: ((_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier])? = nil) {
         self.store = store
         self.transcriptStore = transcriptStore
+        self.failureStore = failureStore
         self.dataManager = dataManager
         self.transcriberProvider = transcriberProvider ?? {
             if #available(iOS 26, *) {
@@ -166,6 +169,11 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             classifiers.append(FoundationModelsAdClassifier())
         }
         return classifiers
+    }
+
+    /// Identifies a set of classifiers, so a failure is only remembered until the model or key changes
+    static func classifiersKey(_ classifiers: [AdClassifier]) -> String {
+        classifiers.map(\.identifier).joined(separator: ",")
     }
 
     /// Episodes that failed may work with different classifiers, so give them another go
@@ -334,7 +342,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     func enqueue(_ episodeUuid: String, force: Bool = false, first: Bool = false) {
         guard FeatureFlag.autoAdSkip.enabled, processingUuid != episodeUuid else { return }
         guard let episode = dataManager.findBaseEpisode(uuid: episodeUuid), isScanning(episode) else { return }
-        guard force || currentAnalysis(for: episode) == nil else { return }
+        guard force || (currentAnalysis(for: episode) == nil && !hasKnownFailure(episode, classifiers: Self.classifiersKey(classifiers))) else { return }
 
         pending.removeAll { $0 == episodeUuid }
         retryableFailures.remove(episodeUuid)
@@ -349,29 +357,33 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     /// Queues every downloaded episode that hasn't been scanned for the file on disk, playing and Up Next first.
     ///
-    /// Episodes that failed since launch are left alone unless `includingFailed`, so a permanent failure isn't retried on every
-    /// foreground. Failures that may clear up, like no network, are always retried.
+    /// A permanent failure isn't tried again, even after a relaunch, until the file or the classifiers change, so a transcript
+    /// that can't be classified isn't sent and paid for over and over. `enqueue` with `force` still tries it on request.
+    /// Failures that may clear up, like no network, are always retried.
     @MainActor
-    func scanMissing(includingFailed: Bool = false) {
+    func scanMissing() {
         guard FeatureFlag.autoAdSkip.enabled else { return }
 
         let downloaded = downloadedEpisodes()
         let downloadedUuids = Set(downloaded.map(\.uuid))
         transcriptStore.removeAll(except: downloadedUuids)
         store.removeAll(except: downloadedUuids)
+        failureStore.removeAll(except: downloadedUuids)
 
         // Without a classifier every scan would fail, so wait for a key
+        let classifiers = classifiers
         guard !classifiers.isEmpty else { return }
 
+        let classifiersKey = Self.classifiersKey(classifiers)
         let episodes = downloaded.filter { isScanning($0) }
-        let scanned = Set(episodes.filter { currentAnalysis(for: $0) != nil }.map(\.uuid))
+        let skipped = Set(episodes.filter { currentAnalysis(for: $0) != nil || hasKnownFailure($0, classifiers: classifiersKey) }.map(\.uuid))
         let upNext = PlaybackManager.shared.queue.allEpisodes(includeNowPlaying: true).map(\.uuid)
         let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: upNext)
 
         let toScan = ordered.filter { uuid in
-            guard uuid != processingUuid, !scanned.contains(uuid) else { return false }
+            guard uuid != processingUuid, !skipped.contains(uuid) else { return false }
             if case .failed = statuses[uuid] {
-                return includingFailed || retryableFailures.contains(uuid)
+                return retryableFailures.contains(uuid)
             }
             return true
         }
@@ -396,6 +408,18 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     @MainActor
     func downloadedEpisodes() -> [BaseEpisode] {
         dataManager.findDownloadedEpisodes().filter { $0.downloaded(pathFinder: DownloadManager.shared) }
+    }
+
+    /// Why this download couldn't be scanned, if it failed for good
+    @MainActor
+    func scanFailure(for episode: BaseEpisode) -> AdScanFailure? {
+        guard let failure = failureStore.failure(for: episode.uuid), failure.audioFileSize == Self.fileSize(of: episode) else { return nil }
+        return failure
+    }
+
+    @MainActor
+    private func hasKnownFailure(_ episode: BaseEpisode, classifiers: String) -> Bool {
+        failureStore.failure(for: episode.uuid)?.matches(audioFileSize: Self.fileSize(of: episode), classifiers: classifiers) == true
     }
 
     @MainActor
@@ -437,8 +461,13 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         retryableFailures.remove(uuid)
 
+        // Captured before the scan, so a failure is tied to the file and classifiers it happened with
+        let classifiersKey = Self.classifiersKey(classifiers)
+        let fileSize = dataManager.findBaseEpisode(uuid: uuid).flatMap { Self.fileSize(of: $0) }
+
         do {
             let (spans, classifier) = try await analyze(uuid)
+            failureStore.remove(uuid)
             statuses[uuid] = .finished(adCount: spans.count, classifier: classifier)
             FileLog.shared.addMessage("AdSkipping: \(classifier) found \(spans.count) ads in \(uuid)")
         } catch where Task.isCancelled {
@@ -450,6 +479,9 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             statuses[uuid] = .failed(error.localizedDescription)
             if AdSkippingError.isRetryable(error) {
                 retryableFailures.insert(uuid)
+            } else if AdSkippingError.isPermanent(error) {
+                let failure = AdScanFailure(audioFileSize: fileSize, classifiers: classifiersKey, message: error.localizedDescription, failedAt: Date())
+                try? failureStore.save(failure, for: uuid)
             }
             FileLog.shared.addMessage("AdSkipping: failed to scan \(uuid): \(error)")
         }
@@ -533,7 +565,16 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let context = AdClassificationContext(podcastTitle: podcastTitle, episodeTitle: episode.title, duration: duration)
 
         var started = clock.now
-        let (foundSpans, classifier, isSuspect) = try await Self.classify(transcript, context: context, using: classifiers)
+        let classification: (spans: [AdSpan], classifier: AdClassifier, isSuspect: Bool)
+        do {
+            classification = try await Self.classify(transcript, context: context, using: classifiers)
+        } catch let error as AdSkippingError {
+            throw error
+        } catch where !Task.isCancelled && !AdSkippingError.isRetryable(error) {
+            // Like an answer that doesn't decode, which will be the same next time
+            throw AdSkippingError.classifierFailed(error.localizedDescription)
+        }
+        let (foundSpans, classifier, isSuspect) = classification
         try Task.checkCancellation()
         timings.firstPass = (clock.now - started).seconds
 

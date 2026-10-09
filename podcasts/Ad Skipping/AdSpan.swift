@@ -198,4 +198,17 @@ enum AdSkippingError: LocalizedError {
         }
         return false
     }
+
+    /// Whether scanning the same file with the same classifiers would only fail the same way again, so it's not worth
+    /// repeating until one of them changes. Unexpected errors, like the speech model failing to download, aren't counted.
+    static func isPermanent(_ error: Error) -> Bool {
+        guard let error = error as? AdSkippingError else { return false }
+
+        switch error {
+        case .classifierFailed, .emptyTranscript, .unsupportedLocale, .transcriptionUnavailable:
+            return true
+        case .notDownloaded, .noClassifier, .classifierUnavailable:
+            return false
+        }
+    }
 }

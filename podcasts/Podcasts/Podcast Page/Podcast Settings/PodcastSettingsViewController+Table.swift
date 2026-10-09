@@ -48,7 +48,8 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(imageName: "download")
             cell.cellSwitch.isOn = podcast.autoDownloadOn() && Settings.autoDownloadEnabled()
 
-            cell.cellSwitch.removeTarget(self, action: #selector(autoDownloadChanged(_:)), for: UIControl.Event.valueChanged)
+            // Reused cells keep the targets of the row they were last, so clear them all
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(autoDownloadChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
@@ -59,7 +60,7 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(imageName: "settings_notifications")
             cell.cellSwitch.isOn = podcast.pushEnabled && NotificationsHelper.shared.pushEnabled()
 
-            cell.cellSwitch.removeTarget(self, action: #selector(notificationChanged(_:)), for: UIControl.Event.valueChanged)
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(notificationChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
@@ -70,7 +71,7 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(imageName: "upnext")
             cell.cellSwitch.isOn = podcast.autoAddToUpNextOn()
 
-            cell.cellSwitch.removeTarget(self, action: #selector(addToUpNextChanged(_:)), for: UIControl.Event.valueChanged)
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(addToUpNextChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
@@ -158,7 +159,7 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(UIImage(systemName: "forward.end"))
             cell.cellSwitch.isOn = AdSkippingManager.shared.isScanning(podcastUuid: podcast.uuid)
 
-            cell.cellSwitch.removeTarget(self, action: #selector(scanForAdsChanged(_:)), for: UIControl.Event.valueChanged)
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(scanForAdsChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell

@@ -71,6 +71,58 @@ final class AdSpanStore {
     }
 }
 
+/// Why a download couldn't be scanned, kept across launches so a scan that will only fail again isn't repeated and paid for
+struct AdScanFailure: Codable, Equatable {
+    /// The size of the download that failed, so a re-download is tried again
+    let audioFileSize: UInt64?
+    /// The classifiers that were tried, so changing the model or key tries again
+    let classifiers: String
+    let message: String
+    let failedAt: Date
+
+    /// Whether scanning this file with these classifiers would only fail the same way again
+    func matches(audioFileSize: UInt64?, classifiers: String) -> Bool {
+        self.audioFileSize == audioFileSize && self.classifiers == classifiers
+    }
+}
+
+/// Persists each episode's `AdScanFailure` as JSON in Application Support
+final class AdScanFailureStore {
+    private let directory: URL
+    private let fileManager: FileManager
+
+    init(directory: URL? = nil, fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+        self.directory = directory ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("AdSkipping/Failures", isDirectory: true)
+    }
+
+    func failure(for episodeUuid: String) -> AdScanFailure? {
+        guard let data = try? Data(contentsOf: fileURL(for: episodeUuid)) else { return nil }
+        return try? JSONDecoder().decode(AdScanFailure.self, from: data)
+    }
+
+    func save(_ failure: AdScanFailure, for episodeUuid: String) throws {
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(failure).write(to: fileURL(for: episodeUuid), options: .atomic)
+    }
+
+    func remove(_ episodeUuid: String) {
+        try? fileManager.removeItem(at: fileURL(for: episodeUuid))
+    }
+
+    /// Deletes the failures of episodes that aren't downloaded any more
+    func removeAll(except episodeUuids: Set<String>) {
+        let files = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "json" && !episodeUuids.contains(file.deletingPathExtension().lastPathComponent) {
+            try? fileManager.removeItem(at: file)
+        }
+    }
+
+    private func fileURL(for episodeUuid: String) -> URL {
+        directory.appendingPathComponent(episodeUuid).appendingPathExtension("json")
+    }
+}
+
 /// Keeps each download's transcript, so a rescan only reruns the classifier and never the slow transcription
 final class TranscriptStore {
     /// Bump when the transcript itself changes, which is the only time a download needs transcribing again

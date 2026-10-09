@@ -138,6 +138,61 @@ final class OpenRouterAdClassifierTests: XCTestCase {
         }
     }
 
+    func testOnlyRetriesStatusCodesThatMayClearUp() {
+        for statusCode in [401, 402, 408, 429, 500, 502, 503, 504] {
+            XCTAssertTrue(OpenRouterAdClassifier.isRetryable(statusCode: statusCode), "\(statusCode)")
+        }
+        for statusCode in [400, 403, 404, 413, 422] {
+            XCTAssertFalse(OpenRouterAdClassifier.isRetryable(statusCode: statusCode), "\(statusCode)")
+        }
+    }
+
+    func testTreatsOtherClientErrorsAsAnAnswerThatCantBeUsed() async {
+        OpenRouterURLProtocol.requestHandler = { request in
+            let body = #"{"error":{"code":404,"message":"No endpoints found that can handle the requested parameters."}}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+
+        do {
+            _ = try await makeClassifier().adSpans(in: transcript, context: context)
+            XCTFail("Expected the request to throw")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "OpenRouter error: No endpoints found that can handle the requested parameters.")
+            XCTAssertFalse(AdSkippingError.isRetryable(error))
+            XCTAssertTrue(AdSkippingError.isPermanent(error))
+        }
+    }
+
+    func testClassifiesUpstreamErrorsReturnedWithA200ByTheirCode() async {
+        OpenRouterURLProtocol.requestHandler = { request in
+            let body = #"{"error":{"code":400,"message":"This model's maximum context length is 200000 tokens"}}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+
+        do {
+            _ = try await makeClassifier().adSpans(in: transcript, context: context)
+            XCTFail("Expected the request to throw")
+        } catch {
+            XCTAssertFalse(AdSkippingError.isRetryable(error))
+            XCTAssertTrue(AdSkippingError.isPermanent(error))
+        }
+    }
+
+    func testTreatsErrorsWithAnUnreadableCodeAsTemporary() async {
+        OpenRouterURLProtocol.requestHandler = { request in
+            let body = #"{"error":{"code":"provider_error","message":"Provider returned error"}}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+
+        do {
+            _ = try await makeClassifier().adSpans(in: transcript, context: context)
+            XCTFail("Expected the request to throw")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "OpenRouter error: Provider returned error")
+            XCTAssertTrue(AdSkippingError.isRetryable(error))
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeClassifier() -> OpenRouterAdClassifier {
@@ -611,6 +666,68 @@ final class TranscriptStoreTests: XCTestCase {
 
         XCTAssertNotNil(store.transcript(for: "kept", audioFileSize: 100))
         XCTAssertNil(store.transcript(for: "deleted", audioFileSize: 100))
+    }
+}
+
+final class AdScanFailureTests: XCTestCase {
+    private var directory: URL!
+
+    private let failure = AdScanFailure(audioFileSize: 100, classifiers: "openrouter:test/model,on-device", message: "The model's response was cut off", failedAt: Date(timeIntervalSince1970: 0))
+
+    override func setUp() {
+        super.setUp()
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: directory)
+        super.tearDown()
+    }
+
+    func testPersistsFailuresAcrossInstances() throws {
+        try AdScanFailureStore(directory: directory).save(failure, for: "episode")
+
+        XCTAssertEqual(AdScanFailureStore(directory: directory).failure(for: "episode"), failure)
+    }
+
+    func testOnlyMatchesTheSameFileAndClassifiers() {
+        XCTAssertTrue(failure.matches(audioFileSize: 100, classifiers: "openrouter:test/model,on-device"))
+        XCTAssertFalse(failure.matches(audioFileSize: 200, classifiers: "openrouter:test/model,on-device"), "A re-download is tried again")
+        XCTAssertFalse(failure.matches(audioFileSize: 100, classifiers: "openrouter:other/model,on-device"), "A different model is tried again")
+        XCTAssertFalse(failure.matches(audioFileSize: 100, classifiers: "openrouter:test/model"), "Losing the backup is tried again")
+    }
+
+    func testIdentifiesClassifiersByModel() {
+        let classifiers: [AdClassifier] = [OpenRouterAdClassifier(apiKey: "key", model: "test/model")]
+
+        XCTAssertEqual(AdSkippingManager.classifiersKey(classifiers), "openrouter:test/model")
+        XCTAssertNotEqual(AdSkippingManager.classifiersKey(classifiers), AdSkippingManager.classifiersKey([OpenRouterAdClassifier(apiKey: "key", model: "other/model")]))
+    }
+
+    func testRemovesFailures() throws {
+        let store = AdScanFailureStore(directory: directory)
+        try store.save(failure, for: "kept")
+        try store.save(failure, for: "rescanned")
+        try store.save(failure, for: "deleted")
+
+        store.remove("rescanned")
+        store.removeAll(except: ["kept", "rescanned"])
+
+        XCTAssertNotNil(store.failure(for: "kept"))
+        XCTAssertNil(store.failure(for: "rescanned"))
+        XCTAssertNil(store.failure(for: "deleted"))
+    }
+
+    func testOnlyRemembersFailuresThatWouldHappenAgain() {
+        XCTAssertTrue(AdSkippingError.isPermanent(AdSkippingError.classifierFailed("Cut off")))
+        XCTAssertTrue(AdSkippingError.isPermanent(AdSkippingError.emptyTranscript))
+        XCTAssertTrue(AdSkippingError.isPermanent(AdSkippingError.unsupportedLocale(Locale(identifier: "xx"))))
+
+        XCTAssertFalse(AdSkippingError.isPermanent(AdSkippingError.classifierUnavailable("Rate limited")))
+        XCTAssertFalse(AdSkippingError.isPermanent(URLError(.notConnectedToInternet)))
+        XCTAssertFalse(AdSkippingError.isPermanent(AdSkippingError.notDownloaded))
+        XCTAssertFalse(AdSkippingError.isPermanent(AdSkippingError.noClassifier))
+        XCTAssertFalse(AdSkippingError.isPermanent(CocoaError(.fileReadUnknown)), "Unexpected errors aren't remembered")
     }
 }
 

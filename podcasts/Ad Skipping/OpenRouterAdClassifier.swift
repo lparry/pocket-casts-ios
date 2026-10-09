@@ -50,7 +50,7 @@ struct OpenRouterAdClassifier: AdClassifier {
 
         guard (200..<300).contains(statusCode) else {
             let message = (try? JSONDecoder().decode(ErrorResponse.self, from: data))?.error.message ?? "HTTP \(statusCode)"
-            throw AdSkippingError.classifierUnavailable("OpenRouter error: \(message)")
+            throw Self.error(message: "OpenRouter error: \(message)", code: statusCode)
         }
 
         let decoder = JSONDecoder()
@@ -59,7 +59,7 @@ struct OpenRouterAdClassifier: AdClassifier {
 
         // OpenRouter can return 200 with an error from the upstream provider
         if let error = response.error {
-            throw AdSkippingError.classifierUnavailable("OpenRouter error: \(error.message)")
+            throw Self.error(message: "OpenRouter error: \(error.message)", code: error.code)
         }
 
         guard let choice = response.choices?.first else {
@@ -75,6 +75,21 @@ struct OpenRouterAdClassifier: AdClassifier {
         }
 
         return contentData
+    }
+
+    /// Whether an error with this HTTP status is likely to clear up: a missing or unpaid key, a timeout, rate limiting, or a
+    /// problem on OpenRouter's or the provider's side. Anything else, like a transcript too long for the model or a model
+    /// that can't follow the schema, fails the same way every time.
+    static func isRetryable(statusCode: Int) -> Bool {
+        [401, 402, 408, 429].contains(statusCode) || (500..<600).contains(statusCode)
+    }
+
+    /// An error without a code is usually the upstream provider failing, so it's treated as temporary
+    private static func error(message: String, code: Int?) -> AdSkippingError {
+        if let code, !isRetryable(statusCode: code) {
+            return .classifierFailed(message)
+        }
+        return .classifierUnavailable(message)
     }
 
     static func requestBody(model: String, transcript: [TranscriptSegment], context: AdClassificationContext) -> [String: Any] {
@@ -178,6 +193,19 @@ struct OpenRouterAdClassifier: AdClassifier {
     private struct ErrorResponse: Decodable {
         struct Detail: Decodable {
             let message: String
+            /// Usually the HTTP status, but read leniently so an unexpected value can't hide the message
+            let code: Int?
+
+            private enum CodingKeys: String, CodingKey {
+                case message
+                case code
+            }
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                message = try container.decode(String.self, forKey: .message)
+                code = try? container.decode(Int.self, forKey: .code)
+            }
         }
 
         let error: Detail

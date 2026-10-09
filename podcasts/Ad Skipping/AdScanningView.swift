@@ -36,7 +36,7 @@ struct AdScanningView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Button(L10n.adSkippingScanAll) {
-                    manager.scanMissing(includingFailed: true)
+                    manager.scanMissing()
                 }
             }
 
@@ -129,7 +129,12 @@ struct AdScanningView: View {
 
         switch manager.statuses[episode.uuid] {
         case .some(.finished), .none:
-            guard let analysis else { return L10n.adSkippingStatusNotScanned }
+            guard let analysis else {
+                if let failure = manager.scanFailure(for: episode) {
+                    return L10n.adSkippingStatusFailed(failure.message)
+                }
+                return L10n.adSkippingStatusNotScanned
+            }
 
             let adTime = analysis.spans.reduce(0) { $0 + $1.duration }
             if analysis.isSuspect {

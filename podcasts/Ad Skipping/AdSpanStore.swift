@@ -37,15 +37,33 @@ final class AdSpanStore {
         cache.withLock { $0[episodeUuid] = .some(nil) }
     }
 
+    /// Deletes the analyses of episodes that aren't downloaded any more
+    func removeAll(except episodeUuids: Set<String>) {
+        let files = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "json" {
+            let episodeUuid = file.deletingPathExtension().lastPathComponent
+            guard !episodeUuids.contains(episodeUuid) else { continue }
+
+            remove(episodeUuid)
+        }
+    }
+
     private func load(_ episodeUuid: String) -> EpisodeAdAnalysis? {
         guard let data = try? Data(contentsOf: fileURL(for: episodeUuid)) else { return nil }
 
-        guard let analysis = try? JSONDecoder().decode(EpisodeAdAnalysis.self, from: data), analysis.version == EpisodeAdAnalysis.currentVersion else {
+        guard let analysis = try? JSONDecoder().decode(EpisodeAdAnalysis.self, from: data), Self.isCurrent(analysis) else {
             FileLog.shared.addMessage("AdSpanStore: discarding unreadable analysis for \(episodeUuid)")
             return nil
         }
 
         return analysis
+    }
+
+    /// Version 2 analyses could fall back to the on-device model when OpenRouter couldn't be reached, so only those found by
+    /// OpenRouter are kept. The rest are scanned again, reusing their transcripts.
+    static func isCurrent(_ analysis: EpisodeAdAnalysis) -> Bool {
+        analysis.version == EpisodeAdAnalysis.currentVersion
+            || (analysis.version == 2 && analysis.classifier.hasPrefix(OpenRouterAdClassifier.identifierPrefix))
     }
 
     private func fileURL(for episodeUuid: String) -> URL {

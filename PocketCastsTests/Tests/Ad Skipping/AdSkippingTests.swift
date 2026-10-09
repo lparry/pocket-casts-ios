@@ -104,6 +104,7 @@ final class OpenRouterAdClassifierTests: XCTestCase {
             XCTFail("Expected the request to throw")
         } catch {
             XCTAssertEqual(error.localizedDescription, "OpenRouter error: No auth credentials found")
+            XCTAssertTrue(AdSkippingError.isRetryable(error))
         }
     }
 
@@ -118,6 +119,7 @@ final class OpenRouterAdClassifierTests: XCTestCase {
             XCTFail("Expected the request to throw")
         } catch {
             XCTAssertEqual(error.localizedDescription, "OpenRouter error: Provider returned error")
+            XCTAssertTrue(AdSkippingError.isRetryable(error))
         }
     }
 
@@ -132,6 +134,7 @@ final class OpenRouterAdClassifierTests: XCTestCase {
             XCTFail("Expected the request to throw")
         } catch {
             XCTAssertEqual(error.localizedDescription, "The model's response was cut off")
+            XCTAssertFalse(AdSkippingError.isRetryable(error))
         }
     }
 
@@ -253,6 +256,81 @@ final class AdSkippingPlaybackTests: XCTestCase {
     }
 }
 
+final class AdClassifierFallbackTests: XCTestCase {
+    private let transcript = [TranscriptSegment(start: 0, end: 600, text: "The whole show.")]
+    private let context = AdClassificationContext(podcastTitle: nil, episodeTitle: nil, duration: 600)
+    private let ad = AdSpan(start: 10, end: 40, kind: .inserted, sponsor: nil)
+
+    func testUsesTheFirstClassifierThatAnswers() async throws {
+        let backup = StubClassifier(identifier: "backup") { [] }
+        let result = try await AdSkippingManager.classify(transcript, context: context, using: [StubClassifier(identifier: "first") { [self.ad] }, backup])
+
+        XCTAssertEqual(result.classifier.identifier, "first")
+        XCTAssertEqual(result.spans, [ad])
+        XCTAssertFalse(result.isSuspect)
+        XCTAssertEqual(backup.calls.count, 0)
+    }
+
+    func testFallsBackWhenTheAnswerCantBeUsed() async throws {
+        let failing = StubClassifier(identifier: "first") { throw AdSkippingError.classifierFailed("Cut off") }
+        let result = try await AdSkippingManager.classify(transcript, context: context, using: [failing, StubClassifier(identifier: "backup") { [self.ad] }])
+
+        XCTAssertEqual(result.classifier.identifier, "backup")
+    }
+
+    func testDoesntFallBackWhenTheClassifierCantBeReached() async {
+        let backup = StubClassifier(identifier: "backup") { [] }
+        let classifiers = [
+            StubClassifier(identifier: "offline") { throw URLError(.notConnectedToInternet) },
+            StubClassifier(identifier: "unauthorised") { throw AdSkippingError.classifierUnavailable("OpenRouter error: No auth credentials found") }
+        ]
+
+        for classifier in classifiers {
+            do {
+                _ = try await AdSkippingManager.classify(transcript, context: context, using: [classifier, backup])
+                XCTFail("Expected \(classifier.identifier) to throw")
+            } catch {
+                XCTAssertTrue(AdSkippingError.isRetryable(error))
+            }
+        }
+        XCTAssertEqual(backup.calls.count, 0)
+    }
+
+    func testKeepsAnImplausibleAnswerAsSuspectRatherThanFallingBack() async throws {
+        let tooMany = (0..<3).map { AdSpan(start: Double($0) * 200, end: Double($0) * 200 + 150, kind: .inserted, sponsor: nil) }
+        let backup = StubClassifier(identifier: "backup") { [self.ad] }
+        let result = try await AdSkippingManager.classify(transcript, context: context, using: [StubClassifier(identifier: "first") { tooMany }, backup])
+
+        XCTAssertEqual(result.classifier.identifier, "first")
+        XCTAssertTrue(result.isSuspect)
+        XCTAssertEqual(backup.calls.count, 0)
+    }
+
+    private final class Calls {
+        var count = 0
+    }
+
+    private struct StubClassifier: AdClassifier {
+        let identifier: String
+        let answer: () throws -> [AdSpan]
+        let calls = Calls()
+
+        init(identifier: String, answer: @escaping () throws -> [AdSpan]) {
+            self.identifier = identifier
+            self.answer = answer
+        }
+
+        func adSpans(in transcript: [TranscriptSegment], context: AdClassificationContext) async throws -> [AdSpan] {
+            calls.count += 1
+            return try answer()
+        }
+
+        func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?] {
+            requests.map { _ in nil }
+        }
+    }
+}
+
 final class AdPlausibilityTests: XCTestCase {
     func testDropsAdsTooShortForTheirKind() {
         let spans = [
@@ -343,7 +421,7 @@ final class AdBoundaryRefinerTests: XCTestCase {
         XCTAssertEqual(window.last?.start, 45)
     }
 
-    func testMovesEdgesOntoTheChosenWords() async {
+    func testMovesEdgesOntoTheChosenWords() async throws {
         // Picks the word 3 before each edge's window midpoint for the start, and the one 2 after for the end
         let classifier = FakeClassifier { request in
             let middle = request.words.firstIndex { $0.start >= (request.edge == .start ? request.ad.start : request.ad.end) } ?? 0
@@ -352,23 +430,34 @@ final class AdBoundaryRefinerTests: XCTestCase {
 
         let spans = [AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil), AdSpan(start: 45, end: 55, kind: .hostRead, sponsor: nil)]
 
-        let refined = await AdBoundaryRefiner(classifier: classifier).refine(spans, words: words, context: context)
+        let refined = try await AdBoundaryRefiner(classifier: classifier).refine(spans, words: words, context: context)
 
         XCTAssertEqual(refined, [AdSpan(start: 17, end: 42.8, kind: .inserted, sponsor: nil), AdSpan(start: 42, end: 57.8, kind: .hostRead, sponsor: nil)])
         // Every edge goes in one request
         XCTAssertEqual(classifier.requestCounter.count, 1)
     }
 
-    func testKeepsEdgesTheClassifierCantPlace() async {
+    func testKeepsEdgesTheClassifierCantPlace() async throws {
         let span = AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil)
 
-        let notFound = await AdBoundaryRefiner(classifier: FakeClassifier { _ in nil }).refine([span], words: words, context: context)
-        let outOfRange = await AdBoundaryRefiner(classifier: FakeClassifier { _ in 500 }).refine([span], words: words, context: context)
-        let failing = await AdBoundaryRefiner(classifier: FakeClassifier { _ in throw URLError(.timedOut) }).refine([span], words: words, context: context)
+        let notFound = try await AdBoundaryRefiner(classifier: FakeClassifier { _ in nil }).refine([span], words: words, context: context)
+        let outOfRange = try await AdBoundaryRefiner(classifier: FakeClassifier { _ in 500 }).refine([span], words: words, context: context)
+        let failing = try await AdBoundaryRefiner(classifier: FakeClassifier { _ in throw AdSkippingError.classifierFailed("Cut off") }).refine([span], words: words, context: context)
 
         XCTAssertEqual(notFound, [span])
         XCTAssertEqual(outOfRange, [span])
         XCTAssertEqual(failing, [span])
+    }
+
+    func testThrowsWhenTheClassifierCantBeReached() async {
+        let span = AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil)
+
+        do {
+            _ = try await AdBoundaryRefiner(classifier: FakeClassifier { _ in throw URLError(.notConnectedToInternet) }).refine([span], words: words, context: context)
+            XCTFail("Expected refining to throw")
+        } catch {
+            XCTAssertTrue(AdSkippingError.isRetryable(error))
+        }
     }
 
     private final class Counter {
@@ -564,11 +653,43 @@ final class AdSpanStoreTests: XCTestCase {
         XCTAssertNil(AdSpanStore(directory: directory).analysis(for: "episode-1"))
     }
 
-    private func makeAnalysis(uuid: String, version: Int = EpisodeAdAnalysis.currentVersion) -> EpisodeAdAnalysis {
+    func testOnlyKeepsVersion2AnalysesFoundByOpenRouter() throws {
+        let store = AdSpanStore(directory: directory)
+        try store.save(makeAnalysis(uuid: "openrouter", version: 2, classifier: "openrouter:test/model"))
+        try store.save(makeAnalysis(uuid: "on-device", version: 2, classifier: "on-device"))
+
+        let reloaded = AdSpanStore(directory: directory)
+        XCTAssertNotNil(reloaded.analysis(for: "openrouter"))
+        XCTAssertNil(reloaded.analysis(for: "on-device"))
+    }
+
+    func testDeletesAnalysesOfEpisodesThatArentDownloaded() throws {
+        let store = AdSpanStore(directory: directory)
+        try store.save(makeAnalysis(uuid: "kept"))
+        try store.save(makeAnalysis(uuid: "deleted"))
+        _ = store.analysis(for: "deleted")
+
+        store.removeAll(except: ["kept"])
+
+        XCTAssertNotNil(store.analysis(for: "kept"))
+        XCTAssertNil(store.analysis(for: "deleted"))
+        XCTAssertNil(AdSpanStore(directory: directory).analysis(for: "deleted"))
+    }
+
+    func testLeavesTranscriptsAloneWhenDeletingAnalyses() throws {
+        let transcripts = TranscriptStore(directory: directory.appendingPathComponent("Transcripts", isDirectory: true))
+        try transcripts.save([TranscriptSegment(start: 0, end: 1, text: "Hi.")], for: "kept", audioFileSize: 1, audioDuration: 1)
+
+        AdSpanStore(directory: directory).removeAll(except: [])
+
+        XCTAssertNotNil(transcripts.transcript(for: "kept", audioFileSize: 1))
+    }
+
+    private func makeAnalysis(uuid: String, version: Int = EpisodeAdAnalysis.currentVersion, classifier: String = "test") -> EpisodeAdAnalysis {
         EpisodeAdAnalysis(version: version,
                           episodeUuid: uuid,
                           analyzedAt: Date(timeIntervalSinceReferenceDate: 1000),
-                          classifier: "test",
+                          classifier: classifier,
                           audioFileSize: 1234,
                           transcriptSegmentCount: 3,
                           spans: [AdSpan(start: 10, end: 40, kind: .inserted, sponsor: "Acme")])

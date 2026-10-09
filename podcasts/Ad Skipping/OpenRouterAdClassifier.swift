@@ -50,7 +50,7 @@ struct OpenRouterAdClassifier: AdClassifier {
 
         guard (200..<300).contains(statusCode) else {
             let message = (try? JSONDecoder().decode(ErrorResponse.self, from: data))?.error.message ?? "HTTP \(statusCode)"
-            throw AdSkippingError.classifierFailed("OpenRouter error: \(message)")
+            throw AdSkippingError.classifierUnavailable("OpenRouter error: \(message)")
         }
 
         let decoder = JSONDecoder()
@@ -59,7 +59,7 @@ struct OpenRouterAdClassifier: AdClassifier {
 
         // OpenRouter can return 200 with an error from the upstream provider
         if let error = response.error {
-            throw AdSkippingError.classifierFailed("OpenRouter error: \(error.message)")
+            throw AdSkippingError.classifierUnavailable("OpenRouter error: \(error.message)")
         }
 
         guard let choice = response.choices?.first else {

@@ -10,7 +10,8 @@ struct AdBoundaryRefiner {
 
     let classifier: AdClassifier
 
-    func refine(_ spans: [AdSpan], words: [TimedWord], context: AdClassificationContext) async -> [AdSpan] {
+    /// Throws when the classifier can't be reached, so the scan is tried again later rather than saved with rough edges
+    func refine(_ spans: [AdSpan], words: [TimedWord], context: AdClassificationContext) async throws -> [AdSpan] {
         let requests = spans.flatMap { span in
             [AdBoundaryEdge.start, .end].map { edge in
                 AdBoundaryRequest(edge: edge, ad: span, words: Self.window(around: edge == .start ? span.start : span.end, in: words), context: context)
@@ -23,6 +24,10 @@ struct AdBoundaryRefiner {
         do {
             answers = try await classifier.boundaryWordIndices(for: askable)
         } catch {
+            try Task.checkCancellation()
+            if AdSkippingError.isRetryable(error) {
+                throw error
+            }
             FileLog.shared.addMessage("AdBoundaryRefiner: couldn't refine \(spans.count) ads: \(error)")
             return spans
         }

@@ -13,8 +13,8 @@ import UIKit
 /// finishes, and as a backfill whenever the app launches or comes to the foreground. A background
 /// processing task carries on with the queue while the device is charging. The local file is
 /// transcribed on device and the timestamped transcript goes to an `AdClassifier`: OpenRouter, with
-/// the listener's own key, falling back to Apple's on-device model if an OpenRouter request fails.
-/// Nothing is scanned without a key. The resulting spans are in the timeline of that download, so they're only used
+/// the listener's own key, falling back to Apple's on-device model only if OpenRouter's answer can't be used.
+/// When OpenRouter can't be reached the scan fails and is tried again later. Nothing is scanned without a key. The resulting spans are in the timeline of that download, so they're only used
 /// while it's still the file on disk.
 ///
 /// Processing runs on the main actor, but playback reads spans from the progress tick, so that state is behind a lock.
@@ -53,6 +53,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     private var processingUuid: String?
     @MainActor
     private var processingTask: Task<Void, Never>?
+    /// Keeps a scan going for a while after the app is backgrounded
+    @MainActor
+    private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
+    /// Episodes that failed for a reason that may clear up, like no network, so they're tried again on the next foreground
+    @MainActor
+    private var retryableFailures: Set<String> = []
     @MainActor
     private var idleContinuations: [CheckedContinuation<Void, Never>] = []
     /// Set when a background task runs out of time, so nothing new starts until the app is next active
@@ -151,7 +157,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     }
 
     /// OpenRouter finds the ads. The on-device model is too unreliable to use on its own, so it's only a backup for
-    /// when an OpenRouter request fails, and nothing is scanned without a key.
+    /// when OpenRouter's answer can't be used, and nothing is scanned without a key.
     private static func defaultClassifiers(openRouterApiKey: String?, openRouterModel: String) -> [AdClassifier] {
         guard let openRouterApiKey else { return [] }
 
@@ -169,6 +175,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             if case .failed = status { return false }
             return true
         }
+        retryableFailures.removeAll()
         scanMissing()
     }
 
@@ -330,6 +337,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         guard force || currentAnalysis(for: episode) == nil else { return }
 
         pending.removeAll { $0 == episodeUuid }
+        retryableFailures.remove(episodeUuid)
         if first {
             pending.insert(episodeUuid, at: 0)
         } else {
@@ -341,14 +349,19 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     /// Queues every downloaded episode that hasn't been scanned for the file on disk, playing and Up Next first.
     ///
-    /// Episodes that failed since launch are left alone unless `includingFailed`, so a permanent failure isn't retried on every foreground.
+    /// Episodes that failed since launch are left alone unless `includingFailed`, so a permanent failure isn't retried on every
+    /// foreground. Failures that may clear up, like no network, are always retried.
     @MainActor
     func scanMissing(includingFailed: Bool = false) {
-        // Without a classifier every scan would fail, so wait for a key
-        guard FeatureFlag.autoAdSkip.enabled, !classifiers.isEmpty else { return }
+        guard FeatureFlag.autoAdSkip.enabled else { return }
 
         let downloaded = downloadedEpisodes()
-        transcriptStore.removeAll(except: Set(downloaded.map(\.uuid)))
+        let downloadedUuids = Set(downloaded.map(\.uuid))
+        transcriptStore.removeAll(except: downloadedUuids)
+        store.removeAll(except: downloadedUuids)
+
+        // Without a classifier every scan would fail, so wait for a key
+        guard !classifiers.isEmpty else { return }
 
         let episodes = downloaded.filter { isScanning($0) }
         let scanned = Set(episodes.filter { currentAnalysis(for: $0) != nil }.map(\.uuid))
@@ -358,7 +371,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let toScan = ordered.filter { uuid in
             guard uuid != processingUuid, !scanned.contains(uuid) else { return false }
             if case .failed = statuses[uuid] {
-                return includingFailed
+                return includingFailed || retryableFailures.contains(uuid)
             }
             return true
         }
@@ -417,13 +430,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func process(_ uuid: String) async {
-        // Transcribing a long episode takes a while, so ask for time to finish if the app is backgrounded
-        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "AdSkipping")
+        beginBackgroundTask()
         defer {
-            if backgroundTask != .invalid {
-                UIApplication.shared.endBackgroundTask(backgroundTask)
-            }
+            endBackgroundTask()
         }
+
+        retryableFailures.remove(uuid)
 
         do {
             let (spans, classifier) = try await analyze(uuid)
@@ -436,8 +448,37 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             FileLog.shared.addMessage("AdSkipping: interrupted while scanning \(uuid)")
         } catch {
             statuses[uuid] = .failed(error.localizedDescription)
+            if AdSkippingError.isRetryable(error) {
+                retryableFailures.insert(uuid)
+            }
             FileLog.shared.addMessage("AdSkipping: failed to scan \(uuid): \(error)")
         }
+    }
+
+    /// Transcribing a long episode takes a while, so ask for time to finish if the app is backgrounded.
+    /// If that time runs out, the scan stops and is picked up again later, so iOS doesn't end the app.
+    @MainActor
+    private func beginBackgroundTask() {
+        endBackgroundTask()
+        backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "AdSkipping") { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+
+                FileLog.shared.addMessage("AdSkipping: ran out of background time, pausing until the app is next active")
+                self.isPaused = true
+                self.processingTask?.cancel()
+                self.scheduleBackgroundScanningIfNeeded()
+                self.endBackgroundTask()
+            }
+        }
+    }
+
+    @MainActor
+    private func endBackgroundTask() {
+        guard backgroundTaskId != .invalid else { return }
+
+        UIApplication.shared.endBackgroundTask(backgroundTaskId)
+        backgroundTaskId = .invalid
     }
 
     @MainActor
@@ -492,14 +533,14 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let context = AdClassificationContext(podcastTitle: podcastTitle, episodeTitle: episode.title, duration: duration)
 
         var started = clock.now
-        let (foundSpans, classifier, isSuspect) = try await classify(transcript, context: context, using: classifiers)
+        let (foundSpans, classifier, isSuspect) = try await Self.classify(transcript, context: context, using: classifiers)
         try Task.checkCancellation()
         timings.firstPass = (clock.now - started).seconds
 
         // Pin each edge to the exact word, then widen it over any jingle or pause in the audio
         let words = transcript.flatMap(\.words)
         started = clock.now
-        let refinedSpans = await AdBoundaryRefiner(classifier: classifier).refine(foundSpans, words: words, context: context)
+        let refinedSpans = try await AdBoundaryRefiner(classifier: classifier).refine(foundSpans, words: words, context: context)
         try Task.checkCancellation()
         timings.edgePass = (clock.now - started).seconds
 
@@ -526,30 +567,30 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return (spans, classifier.identifier)
     }
 
-    /// Tries each classifier in turn until one succeeds with a plausible result.
-    /// If they all find implausibly many ads, the last one's result is returned as suspect.
-    @MainActor
-    private func classify(_ transcript: [TranscriptSegment], context: AdClassificationContext, using classifiers: [AdClassifier]) async throws -> (spans: [AdSpan], classifier: AdClassifier, isSuspect: Bool) {
+    /// Uses the first classifier that gives an answer, moving on only when one's answer can't be used.
+    ///
+    /// An implausible answer is kept and marked suspect rather than handed to a less reliable backup. A classifier that can't be
+    /// reached stops the scan, since the backup's answer would be kept for good when the first one would work again soon.
+    static func classify(_ transcript: [TranscriptSegment], context: AdClassificationContext, using classifiers: [AdClassifier]) async throws -> (spans: [AdSpan], classifier: AdClassifier, isSuspect: Bool) {
         var lastError: Error = AdSkippingError.noClassifier
-        var suspect: ([AdSpan], AdClassifier)?
         for classifier in classifiers {
             do {
                 let spans = try await classifier.adSpans(in: transcript, context: context)
-                guard EpisodeAdAnalysis.looksWrong(spans, duration: context.duration) else {
-                    return (spans, classifier, false)
+                let isSuspect = EpisodeAdAnalysis.looksWrong(spans, duration: context.duration)
+                if isSuspect {
+                    FileLog.shared.addMessage("AdSkipping: \(classifier.identifier) found \(spans.count) ads, which looks wrong, so they won't be skipped")
                 }
-                FileLog.shared.addMessage("AdSkipping: \(classifier.identifier) found \(spans.count) ads, which looks wrong, trying the next classifier")
-                suspect = (spans, classifier)
+                return (spans, classifier, isSuspect)
             } catch {
                 try Task.checkCancellation()
+                if AdSkippingError.isRetryable(error) {
+                    throw error
+                }
                 FileLog.shared.addMessage("AdSkipping: \(classifier.identifier) failed, trying the next classifier: \(error)")
                 lastError = error
             }
         }
 
-        if let (spans, classifier) = suspect {
-            return (spans, classifier, true)
-        }
         throw lastError
     }
 

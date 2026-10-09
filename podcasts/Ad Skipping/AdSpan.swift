@@ -107,7 +107,7 @@ extension TranscriptSegment {
 /// The ads found in one downloaded episode, persisted so each download is only analysed once
 struct EpisodeAdAnalysis: Codable, Equatable {
     /// Bump to rescan every episode when the way ads are found improves
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     let version: Int
     let episodeUuid: String
@@ -168,6 +168,8 @@ enum AdSkippingError: LocalizedError {
     case unsupportedLocale(Locale)
     case emptyTranscript
     case classifierFailed(String)
+    /// The classifier couldn't be reached or turned the request away, so it's worth trying again later
+    case classifierUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -181,8 +183,19 @@ enum AdSkippingError: LocalizedError {
             "On-device transcription doesn't support \(locale.identifier)"
         case .emptyTranscript:
             "The transcript came back empty"
-        case .classifierFailed(let message):
+        case .classifierFailed(let message), .classifierUnavailable(let message):
             message
         }
+    }
+
+    /// Whether the error is a network or account problem that will likely clear up, rather than something about the episode
+    static func isRetryable(_ error: Error) -> Bool {
+        if error is URLError {
+            return true
+        }
+        if case AdSkippingError.classifierUnavailable = error {
+            return true
+        }
+        return false
     }
 }

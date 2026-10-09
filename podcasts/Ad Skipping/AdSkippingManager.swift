@@ -70,6 +70,9 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         /// Spans the listener chose to hear with Undo, keyed by episode, so they aren't skipped again this session
         var restoredSpans: [String: Set<AdSpan>] = [:]
 
+        /// An ad the listener asked to hear from the Ad Scanning screen, keyed by episode, which plays through once
+        var previewedSpans: [String: AdSpan] = [:]
+
         /// Whether each episode's stored analysis was made from the file that's on disk now
         var analysisMatchesFile: [String: Bool] = [:]
 
@@ -264,23 +267,36 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     /// What to skip at `time`, if it's in an ad
     func adSkip(in episode: BaseEpisode, at time: TimeInterval) -> AdSkip? {
-        guard let (spans, kinds, restored) = skippableSpans(in: episode) else { return nil }
+        guard let (spans, kinds, restored) = skippableSpans(in: episode, at: time) else { return nil }
         return Self.adSkip(in: spans, at: time, skipping: kinds, restored: restored)
     }
 
     /// When the next ad starts, if it's after `time` and no more than `within` away
     func nextAdStart(in episode: BaseEpisode, after time: TimeInterval, within: TimeInterval) -> TimeInterval? {
-        guard let (spans, kinds, restored) = skippableSpans(in: episode) else { return nil }
+        guard let (spans, kinds, restored) = skippableSpans(in: episode, at: time) else { return nil }
         return spans.first { $0.start > time && $0.start - time <= within && kinds.contains($0.kind) && !restored.contains($0) }?.start
     }
 
-    private func skippableSpans(in episode: BaseEpisode) -> ([AdSpan], Set<AdSpan.Kind>, Set<AdSpan>)? {
+    private func skippableSpans(in episode: BaseEpisode, at time: TimeInterval) -> ([AdSpan], Set<AdSpan.Kind>, Set<AdSpan>)? {
         guard FeatureFlag.autoAdSkip.enabled, isScanning(episode), let analysis = currentAnalysis(for: episode), !analysis.isSuspect, !analysis.spans.isEmpty else {
             return nil
         }
 
-        let (restored, skippedKinds) = playbackState.withLock { ($0.restoredSpans[episode.uuid] ?? [], $0.skippedKinds) }
+        let (restored, skippedKinds) = playbackState.withLock { state in
+            var restored = state.restoredSpans[episode.uuid] ?? []
+            state.previewedSpans[episode.uuid] = Self.preview(state.previewedSpans[episode.uuid], at: time)
+            if let previewed = state.previewedSpans[episode.uuid] {
+                restored.insert(previewed)
+            }
+            return (restored, state.skippedKinds)
+        }
         return (analysis.spans, skippedKinds, restored)
+    }
+
+    /// The previewed ad, until playback reaches its end, after which it's skipped like any other
+    static func preview(_ span: AdSpan?, at time: TimeInterval) -> AdSpan? {
+        guard let span, time < span.end else { return nil }
+        return span
     }
 
     static func adSkip(in spans: [AdSpan], at time: TimeInterval, skipping kinds: Set<AdSpan.Kind>, restored: Set<AdSpan>) -> AdSkip? {
@@ -458,10 +474,10 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return excerpts
     }
 
-    /// Plays from just before an ad, and lets it play this session, so the listener can hear what was found
+    /// Plays from just before an ad, and lets it play through once, so the listener can hear what was found
     @MainActor
     func play(_ span: AdSpan, in episode: BaseEpisode) {
-        restore([span], in: episode.uuid)
+        playbackState.withLock { $0.previewedSpans[episode.uuid] = span }
 
         let time = max(0, span.start - 3)
         let playbackManager = PlaybackManager.shared

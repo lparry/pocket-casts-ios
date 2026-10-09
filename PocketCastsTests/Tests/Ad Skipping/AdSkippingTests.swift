@@ -309,6 +309,16 @@ final class AdSkippingPlaybackTests: XCTestCase {
 
         XCTAssertEqual(AdSkippingManager.adSkip(in: adBreak, at: 20, skipping: [.inserted], restored: [])?.end, 40)
     }
+
+    func testPlaysAPreviewedAdThroughOnceOnly() {
+        let ad = AdSpan(start: 100, end: 130, kind: .inserted, sponsor: nil)
+
+        XCTAssertEqual(AdSkippingManager.preview(ad, at: 0), ad, "Kept while the episode loads")
+        XCTAssertEqual(AdSkippingManager.preview(ad, at: 97), ad)
+        XCTAssertEqual(AdSkippingManager.preview(ad, at: 129.9), ad)
+        XCTAssertNil(AdSkippingManager.preview(ad, at: 130), "Skipped again once it has played")
+        XCTAssertNil(AdSkippingManager.preview(nil, at: 100))
+    }
 }
 
 final class AdClassifierFallbackTests: XCTestCase {

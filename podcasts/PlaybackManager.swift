@@ -34,6 +34,8 @@ class PlaybackManager: ServerPlaybackDelegate {
     }
 
     private var updateTimer: Timer?
+    /// A check for an ad that starts between progress ticks
+    private var adSkipCheck: DispatchWorkItem?
     private var updateCount = 0
 
     private var currentEffects: PlaybackEffects?
@@ -534,27 +536,49 @@ class PlaybackManager: ServerPlaybackDelegate {
     /// Skips past an ad found in the downloaded file, offering to undo it
     private func checkForAdSkip() {
 #if !APPCLIP && !os(watchOS) && !os(tvOS)
+        adSkipCheck?.cancel()
+        adSkipCheck = nil
+
         guard FeatureFlag.autoAdSkip.enabled, isPlaying, !isSeeking, let episode = currentEpisode else { return }
 
         let time = currentTime()
-        guard let ad = AdSkippingManager.shared.adToSkip(in: episode, at: time) else { return }
+        guard let skip = AdSkippingManager.shared.adSkip(in: episode, at: time) else {
+            scheduleAdSkipCheck(for: episode, after: time)
+            return
+        }
 
         let episodeDuration = duration()
-        let skipTo = episodeDuration > 0 ? min(ad.end, episodeDuration) : ad.end
-        FileLog.shared.addMessage("Skipping \(ad.kind.rawValue) ad from \(time) to \(skipTo) in \(episode.uuid)")
+        let skipTo = episodeDuration > 0 ? min(skip.end, episodeDuration) : skip.end
+        FileLog.shared.addMessage("Skipping \(skip.spans.count) ads (\(skip.spans.map(\.kind.rawValue).joined(separator: ", "))) from \(time) to \(skipTo) in \(episode.uuid)")
         StatsManager.shared.addAutoSkipTime(skipTo - time)
         seekTo(time: skipTo)
 
         let episodeUuid = episode.uuid
+        let title = skip.spans.count == 1 ? L10n.adSkippingSkipped : L10n.adSkippingSkippedPlural(skip.spans.count.localized())
         Task { @MainActor [weak self] in
-            Toast.show(L10n.adSkippingSkipped, actions: [.init(title: L10n.adSkippingUndo) { [weak self] in
-                AdSkippingManager.shared.restore(ad, in: episodeUuid)
+            Toast.show(title, actions: [.init(title: L10n.adSkippingUndo) { [weak self] in
+                AdSkippingManager.shared.restore(skip.spans, in: episodeUuid)
                 guard let self, currentEpisode?.uuid == episodeUuid else { return }
                 seekTo(time: time)
             }])
         }
 #endif
     }
+
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+    /// The progress tick only comes once a second, so check again exactly when an ad that's about to start begins
+    private func scheduleAdSkipCheck(for episode: BaseEpisode, after time: TimeInterval) {
+        let rate = max(player?.playbackRate() ?? 1, 0.1)
+        guard let start = AdSkippingManager.shared.nextAdStart(in: episode, after: time, within: (updateTimerInterval + 0.5) * rate) else { return }
+
+        let check = DispatchWorkItem { [weak self] in
+            self?.checkForAdSkip()
+        }
+        adSkipCheck = check
+        // A moment after the start, so the player is definitely inside the ad
+        DispatchQueue.main.asyncAfter(deadline: .now() + (start - time) / rate + 0.05, execute: check)
+    }
+#endif
 
     var isSeeking: Bool {
         seekingTo != PlaybackManager.notSeeking

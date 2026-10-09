@@ -50,6 +50,19 @@ struct FoundationModelsAdClassifier: AdClassifier {
         return cleanedUp(spans, duration: context.duration)
     }
 
+    func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int? {
+        guard model.isAvailable else {
+            throw AdSkippingError.classifierFailed(Self.unavailableDescription(model.availability))
+        }
+
+        let session = LanguageModelSession(model: model, instructions: AdClassifierPrompt.boundaryInstructions)
+        let response = try await session.respond(to: AdClassifierPrompt.boundaryPrompt(for: request),
+                                                 generating: OnDeviceAdBoundary.self,
+                                                 options: GenerationOptions(samplingMode: .greedy))
+        let index = response.content.wordIndex
+        return index >= 0 ? index : nil
+    }
+
     /// Classifies one chunk, halving it if the model can't take it all
     private func adSpans(inChunk chunk: [TranscriptSegment], context: AdClassificationContext, splitsRemaining: Int) async throws -> [AdSpan] {
         do {
@@ -71,8 +84,9 @@ struct FoundationModelsAdClassifier: AdClassifier {
     private static let instructions = AdClassifierPrompt.instructions + """
 
 
-    You'll only see part of the episode. Report the ads in this part, and if an ad runs off the start or end of the \
-    part, use the first or last line's time.
+    You'll only see part of the episode. Most of an episode is the show itself, so most parts have no ads. Only report \
+    clear ads, not the hosts talking about a product, a company or another show as part of the conversation. If an ad \
+    runs off the start or end of the part, use the first or last line's time.
     """
 
     // MARK: - Chunking
@@ -131,6 +145,13 @@ struct FoundationModelsAdClassifier: AdClassifier {
 struct OnDeviceAdList {
     @Guide(description: "Every ad in this part of the transcript, in order")
     var ads: [OnDeviceAd]
+}
+
+@available(iOS 26, *)
+@Generable
+struct OnDeviceAdBoundary {
+    @Guide(description: "The index of the ad's first or last word, or -1 if it isn't in these words")
+    var wordIndex: Int
 }
 
 @available(iOS 26, *)

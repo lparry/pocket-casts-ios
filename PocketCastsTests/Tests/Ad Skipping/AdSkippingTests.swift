@@ -49,6 +49,25 @@ final class OpenRouterAdClassifierTests: XCTestCase {
         XCTAssertTrue(prompt.contains("[4.5-30.0] This episode is brought to you by Acme."))
     }
 
+    func testAsksForTheExactBoundaryWord() async throws {
+        var receivedBody: [String: Any]?
+        OpenRouterURLProtocol.requestHandler = { request in
+            receivedBody = try JSONSerialization.jsonObject(with: request.bodyData) as? [String: Any]
+            return Self.success(content: #"{"word_index": 1}"#)
+        }
+        let request = AdBoundaryRequest(edge: .start,
+                                        ad: AdSpan(start: 79.3, end: 107.7, kind: .inserted, sponsor: "Bank"),
+                                        words: [TimedWord(start: 76.3, end: 77, text: "courtroom."), TimedWord(start: 79.32, end: 79.62, text: "Your")],
+                                        context: context)
+
+        let index = try await makeClassifier().boundaryWordIndex(for: request)
+
+        XCTAssertEqual(index, 1)
+        let prompt = try XCTUnwrap((receivedBody?["messages"] as? [[String: Any]])?.last?["content"] as? String)
+        XCTAssertTrue(prompt.contains("Which word starts this ad?"))
+        XCTAssertTrue(prompt.contains("1 [79.32] Your"))
+    }
+
     func testCleansUpSpans() async throws {
         OpenRouterURLProtocol.requestHandler = { _ in
             Self.success(ads: [
@@ -119,9 +138,13 @@ final class OpenRouterAdClassifierTests: XCTestCase {
 
     private static func success(ads: [[String: Any]]) -> (HTTPURLResponse, Data) {
         let output = try! JSONSerialization.data(withJSONObject: ["ads": ads])
+        return success(content: String(decoding: output, as: UTF8.self))
+    }
+
+    private static func success(content: String) -> (HTTPURLResponse, Data) {
         let body: [String: Any] = [
             "choices": [
-                ["message": ["role": "assistant", "content": String(decoding: output, as: UTF8.self)], "finish_reason": "stop"]
+                ["message": ["role": "assistant", "content": content], "finish_reason": "stop"]
             ]
         ]
         let response = HTTPURLResponse(url: URL(string: "https://openrouter.ai/api/v1/chat/completions")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
@@ -180,21 +203,226 @@ final class AdSkippingPlaybackTests: XCTestCase {
         AdSpan(start: 100, end: 130, kind: .selfPromo, sponsor: nil)
     ]
 
-    func testSkipsTheAdThatContainsTheTime() {
-        let ad = AdSkippingManager.adToSkip(in: spans, at: 12, skipping: Set(AdSpan.Kind.allCases), restored: [])
+    private let allKinds = Set(AdSpan.Kind.allCases)
 
-        XCTAssertEqual(ad, spans[0])
-        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 50, skipping: Set(AdSpan.Kind.allCases), restored: []))
+    func testSkipsTheAdThatContainsTheTime() {
+        XCTAssertEqual(AdSkippingManager.adSkip(in: spans, at: 12, skipping: allKinds, restored: []), AdSkip(spans: [spans[0]]))
+        XCTAssertNil(AdSkippingManager.adSkip(in: spans, at: 50, skipping: allKinds, restored: []))
     }
 
     func testOnlySkipsTheChosenKinds() {
-        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 110, skipping: [.hostRead], restored: []))
-        XCTAssertEqual(AdSkippingManager.adToSkip(in: spans, at: 110, skipping: [.selfPromo], restored: []), spans[1])
+        XCTAssertNil(AdSkippingManager.adSkip(in: spans, at: 110, skipping: [.hostRead], restored: []))
+        XCTAssertEqual(AdSkippingManager.adSkip(in: spans, at: 110, skipping: [.selfPromo], restored: [])?.spans, [spans[1]])
     }
 
     func testDoesntSkipRestoredAdsOrTheLastSecond() {
-        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 12, skipping: Set(AdSpan.Kind.allCases), restored: [spans[0]]))
-        XCTAssertNil(AdSkippingManager.adToSkip(in: spans, at: 39.5, skipping: Set(AdSpan.Kind.allCases), restored: []))
+        XCTAssertNil(AdSkippingManager.adSkip(in: spans, at: 12, skipping: allKinds, restored: [spans[0]]))
+        XCTAssertNil(AdSkippingManager.adSkip(in: spans, at: 39.5, skipping: allKinds, restored: []))
+    }
+
+    func testJoinsAdsInTheSameBreak() {
+        // Gaps like these, full of jingles and pauses, came from a real episode
+        let adBreak = [
+            AdSpan(start: 79.3, end: 107.7, kind: .inserted, sponsor: "Bank"),
+            AdSpan(start: 110.3, end: 168.4, kind: .hostRead, sponsor: "Insurer"),
+            AdSpan(start: 174.6, end: 200, kind: .inserted, sponsor: "Coffee"),
+            AdSpan(start: 640.5, end: 668.7, kind: .inserted, sponsor: "Bank")
+        ]
+
+        let skip = AdSkippingManager.adSkip(in: adBreak, at: 80, skipping: allKinds, restored: [])
+
+        XCTAssertEqual(skip?.spans, Array(adBreak[0...2]))
+        XCTAssertEqual(skip?.end, 200)
+    }
+
+    func testStopsJoiningAtAnAdThatIsntSkipped() {
+        let adBreak = [
+            AdSpan(start: 10, end: 40, kind: .inserted, sponsor: nil),
+            AdSpan(start: 42, end: 60, kind: .selfPromo, sponsor: nil),
+            AdSpan(start: 62, end: 90, kind: .inserted, sponsor: nil)
+        ]
+
+        XCTAssertEqual(AdSkippingManager.adSkip(in: adBreak, at: 20, skipping: [.inserted], restored: [])?.end, 40)
+    }
+}
+
+final class AdPlausibilityTests: XCTestCase {
+    func testDropsAdsTooShortForTheirKind() {
+        let spans = [
+            AdSpan(start: 0, end: 6, kind: .hostRead, sponsor: nil),
+            AdSpan(start: 10, end: 24.3, kind: .inserted, sponsor: nil),
+            AdSpan(start: 30, end: 37, kind: .crossPromo, sponsor: nil),
+            AdSpan(start: 40, end: 45.2, kind: .selfPromo, sponsor: nil),
+            AdSpan(start: 50, end: 54, kind: .selfPromo, sponsor: nil)
+        ]
+
+        let cleaned = OpenRouterAdClassifier(apiKey: "", model: "").cleanedUp(spans, duration: 100)
+
+        XCTAssertEqual(cleaned.map(\.start), [10, 40])
+    }
+
+    func testShortFalsePositivesCantJoinIntoABreak() {
+        // Two real ads 10s apart, with a 6s "host read" between them that would otherwise bridge the gap
+        let spans = [
+            AdSpan(start: 0, end: 30, kind: .inserted, sponsor: nil),
+            AdSpan(start: 33, end: 39, kind: .hostRead, sponsor: nil),
+            AdSpan(start: 40, end: 70, kind: .inserted, sponsor: nil)
+        ]
+
+        let cleaned = OpenRouterAdClassifier(apiKey: "", model: "").cleanedUp(spans, duration: 100)
+        let skip = AdSkippingManager.adSkip(in: cleaned, at: 5, skipping: Set(AdSpan.Kind.allCases), restored: [])
+
+        XCTAssertEqual(skip?.end, 30)
+    }
+
+    func testFlagsImplausibleResults() {
+        func ads(_ count: Int, each length: TimeInterval) -> [AdSpan] {
+            (0..<count).map { AdSpan(start: Double($0) * 100, end: Double($0) * 100 + length, kind: .inserted, sponsor: nil) }
+        }
+
+        // A real 26 minute news episode: 8 ads, 23% of it
+        XCTAssertFalse(EpisodeAdAnalysis.looksWrong(ads(8, each: 44.5), duration: 1560))
+        // Half the episode
+        XCTAssertTrue(EpisodeAdAnalysis.looksWrong(ads(3, each: 300), duration: 1800))
+        // 54 ads in 45 minutes
+        XCTAssertTrue(EpisodeAdAnalysis.looksWrong(ads(54, each: 6), duration: 2700))
+        // A few ads in a short episode isn't too many an hour
+        XCTAssertFalse(EpisodeAdAnalysis.looksWrong(ads(3, each: 15), duration: 600))
+    }
+
+    func testRemembersSuspectAnalyses() throws {
+        var analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion, episodeUuid: "e", analyzedAt: Date(), classifier: "on-device", audioFileSize: 1, transcriptSegmentCount: 1, spans: [])
+        XCTAssertFalse(analysis.isSuspect)
+        analysis.isSuspect = true
+        let decoded = try JSONDecoder().decode(EpisodeAdAnalysis.self, from: JSONEncoder().encode(analysis))
+        XCTAssertTrue(decoded.isSuspect)
+    }
+}
+
+final class TranscriptLineTests: XCTestCase {
+    func testBreaksLinesAtSentencesPausesAndTheMaximumLength() {
+        let words = [
+            TimedWord(start: 0, end: 0.5, text: "Hello"),
+            TimedWord(start: 0.5, end: 1, text: "there."),
+            TimedWord(start: 1.1, end: 1.5, text: "We'll"),
+            TimedWord(start: 1.5, end: 2, text: "be"),
+            // A pause before the next word
+            TimedWord(start: 3, end: 3.5, text: "right"),
+            TimedWord(start: 3.5, end: 6, text: "back"),
+            TimedWord(start: 6, end: 9, text: "after"),
+            TimedWord(start: 9, end: 9.5, text: "this")
+        ]
+
+        let lines = TranscriptSegment.lines(from: words, maxDuration: 5, pause: 0.5)
+
+        XCTAssertEqual(lines.map(\.text), ["Hello there.", "We'll be", "right back", "after this"])
+        XCTAssertEqual(lines.map(\.start), [0, 1.1, 3, 6])
+        XCTAssertEqual(lines.map(\.end), [1, 2, 6, 9.5])
+        XCTAssertEqual(lines[1].words, Array(words[2...3]))
+    }
+}
+
+final class AdBoundaryRefinerTests: XCTestCase {
+    private let words = (0..<60).map { index in
+        TimedWord(start: Double(index), end: Double(index) + 0.8, text: "word\(index)")
+    }
+
+    private let context = AdClassificationContext(podcastTitle: nil, episodeTitle: nil, duration: 60)
+
+    func testShowsTheWordsAroundEachEdge() {
+        let window = AdBoundaryRefiner.window(around: 30, in: words)
+
+        XCTAssertEqual(window.first?.start, 15)
+        XCTAssertEqual(window.last?.start, 45)
+    }
+
+    func testMovesEdgesOntoTheChosenWords() async {
+        // Picks the word 3 before each edge's window midpoint for the start, and the one 2 after for the end
+        let classifier = FakeClassifier { request in
+            let middle = request.words.firstIndex { $0.start >= (request.edge == .start ? request.ad.start : request.ad.end) } ?? 0
+            return request.edge == .start ? middle - 3 : middle + 2
+        }
+
+        let refined = await AdBoundaryRefiner(classifier: classifier).refine([AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil)], words: words, context: context)
+
+        XCTAssertEqual(refined, [AdSpan(start: 17, end: 42.8, kind: .inserted, sponsor: nil)])
+    }
+
+    func testKeepsEdgesTheClassifierCantPlace() async {
+        let span = AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil)
+
+        let notFound = await AdBoundaryRefiner(classifier: FakeClassifier { _ in nil }).refine([span], words: words, context: context)
+        let outOfRange = await AdBoundaryRefiner(classifier: FakeClassifier { _ in 500 }).refine([span], words: words, context: context)
+        let failing = await AdBoundaryRefiner(classifier: FakeClassifier { _ in throw URLError(.timedOut) }).refine([span], words: words, context: context)
+
+        XCTAssertEqual(notFound, [span])
+        XCTAssertEqual(outOfRange, [span])
+        XCTAssertEqual(failing, [span])
+    }
+
+    private struct FakeClassifier: AdClassifier {
+        let boundary: (AdBoundaryRequest) throws -> Int?
+
+        var identifier: String {
+            "fake"
+        }
+
+        func adSpans(in transcript: [TranscriptSegment], context: AdClassificationContext) async throws -> [AdSpan] {
+            []
+        }
+
+        func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int? {
+            try boundary(request)
+        }
+    }
+}
+
+final class AudioBoundarySnapperTests: XCTestCase {
+    /// Levels in 20ms blocks, starting at 0s
+    private func levels(_ stretches: [(seconds: Double, level: Float)]) -> [Float] {
+        stretches.flatMap { Array(repeating: $0.level, count: Int(($0.seconds / 0.02).rounded())) }
+    }
+
+    func testMovesAnEndEdgeOntoTheSilenceAfterIt() {
+        // Ad speech, a jingle, then silence from 2.5s to 3s
+        let levels = levels([(2, -20), (0.5, -15), (0.5, -70), (1, -20)])
+
+        let snapped = AudioBoundarySnapper.snappedTime(near: 2, allowed: 2...4, levels: levels, levelsStart: 0)
+
+        XCTAssertEqual(snapped ?? 0, 2.75, accuracy: 0.01)
+    }
+
+    func testNeverMovesAnEdgeInwards() {
+        // Silence only before an end edge, which would cut the ad short
+        let levels = levels([(1, -20), (0.5, -70), (2.5, -20)])
+
+        XCTAssertNil(AudioBoundarySnapper.snappedTime(near: 2, allowed: 2...4, levels: levels, levelsStart: 0))
+    }
+
+    func testFallsBackToASuddenChangeInLoudness() {
+        // A jingle starts at 1.5s, with no silence anywhere
+        let levels = levels([(1.5, -38), (2.5, -14)])
+
+        let snapped = AudioBoundarySnapper.snappedTime(near: 2, allowed: 0...2, levels: levels, levelsStart: 0)
+
+        XCTAssertEqual(snapped ?? 0, 1.5, accuracy: 0.01)
+    }
+
+    func testLeavesEdgesWithNothingNearby() {
+        XCTAssertNil(AudioBoundarySnapper.snappedTime(near: 2, allowed: 0...4, levels: levels([(4, -20)]), levelsStart: 0))
+    }
+
+    func testStaysBetweenTheNeighbouringWords() {
+        let span = AdSpan(start: 10, end: 20, kind: .inserted, sponsor: nil)
+        let words = [
+            TimedWord(start: 8, end: 9, text: "show"),
+            TimedWord(start: 10, end: 11, text: "ad"),
+            TimedWord(start: 19, end: 20, text: "ad"),
+            TimedWord(start: 21, end: 22, text: "show")
+        ]
+
+        XCTAssertEqual(AudioBoundarySnapper.startRange(for: span, words: words), 9...10)
+        XCTAssertEqual(AudioBoundarySnapper.endRange(for: span, words: words), 20...21)
     }
 }
 

@@ -26,21 +26,88 @@ struct AdSpan: Codable, Equatable, Hashable {
         end - start
     }
 
+    /// Anything shorter is almost certainly the hosts talking, not an ad. Real inserted ads on the listener's
+    /// phone were as short as 14.3s, and a broadcaster's own promos as short as 5.2s.
+    var minimumDuration: TimeInterval {
+        switch kind {
+        case .hostRead, .inserted:
+            12
+        case .crossPromo:
+            8
+        case .selfPromo:
+            5
+        }
+    }
+
     func contains(_ time: TimeInterval) -> Bool {
         time >= start && time < end
     }
 }
 
-/// One timestamped line of an on-device transcript
-struct TranscriptSegment: Codable, Equatable {
+/// One or more ads in a row, skipped together
+struct AdSkip: Equatable {
+    let spans: [AdSpan]
+
+    var start: TimeInterval {
+        spans.first?.start ?? 0
+    }
+
+    var end: TimeInterval {
+        spans.last?.end ?? 0
+    }
+}
+
+/// One word of an on-device transcript, with when it was spoken
+struct TimedWord: Equatable {
     let start: TimeInterval
     let end: TimeInterval
     let text: String
 }
 
+/// One timestamped line of an on-device transcript
+struct TranscriptSegment: Equatable {
+    let start: TimeInterval
+    let end: TimeInterval
+    let text: String
+    /// The words in the line, used to find exactly where an ad starts and ends
+    var words: [TimedWord] = []
+}
+
+extension TranscriptSegment {
+    /// Groups words into short lines, breaking at the end of a sentence, at a pause, or before a line gets too long.
+    /// Short lines let the classifier place an ad's edges close to where they really are.
+    static func lines(from words: [TimedWord], maxDuration: TimeInterval = 5, pause: TimeInterval = 0.5) -> [TranscriptSegment] {
+        var lines: [TranscriptSegment] = []
+        var current: [TimedWord] = []
+
+        func flush() {
+            guard let first = current.first, let last = current.last else { return }
+            lines.append(TranscriptSegment(start: first.start, end: last.end, text: current.map(\.text).joined(separator: " "), words: current))
+            current = []
+        }
+
+        for word in words {
+            if let first = current.first, let previous = current.last,
+               word.start - previous.end >= pause || word.end - first.start > maxDuration {
+                flush()
+            }
+
+            current.append(word)
+
+            if let lastCharacter = word.text.last, ".?!".contains(lastCharacter) {
+                flush()
+            }
+        }
+        flush()
+
+        return lines
+    }
+}
+
 /// The ads found in one downloaded episode, persisted so each download is only analysed once
 struct EpisodeAdAnalysis: Codable, Equatable {
-    static let currentVersion = 1
+    /// Bump to rescan every episode when the way ads are found improves
+    static let currentVersion = 2
 
     let version: Int
     let episodeUuid: String
@@ -51,6 +118,20 @@ struct EpisodeAdAnalysis: Codable, Equatable {
     let audioFileSize: UInt64?
     let transcriptSegmentCount: Int
     let spans: [AdSpan]
+    /// Set when the spans look implausible, so they're shown but never skipped
+    var isSuspect = false
+}
+
+extension EpisodeAdAnalysis {
+    /// Whether this many ads couldn't be right: more than 40% of the episode, or more than 24 an hour.
+    /// A real news episode on the listener's phone had 8 ads, 23% of its length, at about 19 an hour.
+    static func looksWrong(_ spans: [AdSpan], duration: TimeInterval) -> Bool {
+        guard duration > 0 else { return false }
+
+        let adTime = spans.reduce(0) { $0 + $1.duration }
+        let perHour = Double(spans.count) / (duration / 3600)
+        return adTime / duration > 0.4 || (spans.count > 6 && perHour > 24)
+    }
 }
 
 enum AdSkippingError: LocalizedError {

@@ -238,24 +238,48 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     // MARK: - Playback
 
-    /// The ad to skip at `time`, if any
-    func adToSkip(in episode: BaseEpisode, at time: TimeInterval) -> AdSpan? {
-        guard FeatureFlag.autoAdSkip.enabled, isScanning(episode), let analysis = currentAnalysis(for: episode), !analysis.spans.isEmpty else {
+    /// Ads in the same break are joined into one skip when they're at most this far apart, so the jingles and pauses between them don't play
+    static let breakGap: TimeInterval = 8
+
+    /// What to skip at `time`, if it's in an ad
+    func adSkip(in episode: BaseEpisode, at time: TimeInterval) -> AdSkip? {
+        guard let (spans, kinds, restored) = skippableSpans(in: episode) else { return nil }
+        return Self.adSkip(in: spans, at: time, skipping: kinds, restored: restored)
+    }
+
+    /// When the next ad starts, if it's after `time` and no more than `within` away
+    func nextAdStart(in episode: BaseEpisode, after time: TimeInterval, within: TimeInterval) -> TimeInterval? {
+        guard let (spans, kinds, restored) = skippableSpans(in: episode) else { return nil }
+        return spans.first { $0.start > time && $0.start - time <= within && kinds.contains($0.kind) && !restored.contains($0) }?.start
+    }
+
+    private func skippableSpans(in episode: BaseEpisode) -> ([AdSpan], Set<AdSpan.Kind>, Set<AdSpan>)? {
+        guard FeatureFlag.autoAdSkip.enabled, isScanning(episode), let analysis = currentAnalysis(for: episode), !analysis.isSuspect, !analysis.spans.isEmpty else {
             return nil
         }
 
         let (restored, skippedKinds) = playbackState.withLock { ($0.restoredSpans[episode.uuid] ?? [], $0.skippedKinds) }
-        return Self.adToSkip(in: analysis.spans, at: time, skipping: skippedKinds, restored: restored)
+        return (analysis.spans, skippedKinds, restored)
     }
 
-    static func adToSkip(in spans: [AdSpan], at time: TimeInterval, skipping kinds: Set<AdSpan.Kind>, restored: Set<AdSpan>) -> AdSpan? {
+    static func adSkip(in spans: [AdSpan], at time: TimeInterval, skipping kinds: Set<AdSpan.Kind>, restored: Set<AdSpan>) -> AdSkip? {
+        let skippable = spans.filter { kinds.contains($0.kind) && !restored.contains($0) }.sorted { $0.start < $1.start }
+        guard let index = skippable.firstIndex(where: { $0.contains(time) }) else { return nil }
+
+        var joined = [skippable[index]]
+        for span in skippable[(index + 1)...] {
+            guard let last = joined.last, span.start - last.end <= breakGap else { break }
+            joined.append(span)
+        }
+
+        let skip = AdSkip(spans: joined)
         // Don't bother skipping the last moment of an ad
-        spans.first { $0.contains(time) && $0.end - time > 1 && kinds.contains($0.kind) && !restored.contains($0) }
+        return skip.end - time > 1 ? skip : nil
     }
 
-    /// Stops `span` being skipped again until the next launch
-    func restore(_ span: AdSpan, in episodeUuid: String) {
-        playbackState.withLock { _ = $0.restoredSpans[episodeUuid, default: []].insert(span) }
+    /// Stops these ads being skipped again until the next launch
+    func restore(_ spans: [AdSpan], in episodeUuid: String) {
+        playbackState.withLock { $0.restoredSpans[episodeUuid, default: []].formUnion(spans) }
     }
 
     /// The stored analysis, if it was made from the download that's on disk now. Spans never line up with a stream.
@@ -434,9 +458,18 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         statuses[uuid] = .classifying
         let podcastTitle = (episode as? Episode)?.parentPodcast(dataManager: dataManager)?.title
-        let context = AdClassificationContext(podcastTitle: podcastTitle, episodeTitle: episode.title, duration: episode.duration)
-        let (spans, classifier) = try await classify(transcript, context: context, using: classifiers)
+        // The episode's duration isn't always known yet, but the transcript runs nearly to the end
+        let duration = episode.duration > 0 ? episode.duration : transcript.last?.end ?? 0
+        let context = AdClassificationContext(podcastTitle: podcastTitle, episodeTitle: episode.title, duration: duration)
+        let (foundSpans, classifier, isSuspect) = try await classify(transcript, context: context, using: classifiers)
         try Task.checkCancellation()
+
+        // Pin each edge to the exact word, then widen it over any jingle or pause in the audio
+        let words = transcript.flatMap(\.words)
+        let refinedSpans = await AdBoundaryRefiner(classifier: classifier).refine(foundSpans, words: words, context: context)
+        try Task.checkCancellation()
+        let snappedSpans = await AudioBoundarySnapper.snap(refinedSpans, words: words, fileURL: fileURL)
+        let spans = classifier.cleanedUp(snappedSpans, duration: context.duration)
 
         let analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion,
                                          episodeUuid: uuid,
@@ -444,7 +477,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
                                          classifier: classifier.identifier,
                                          audioFileSize: fileSize,
                                          transcriptSegmentCount: transcript.count,
-                                         spans: spans)
+                                         spans: spans,
+                                         isSuspect: isSuspect)
         try store.save(analysis)
         forgetFileMatch(for: uuid)
         analysesVersion += 1
@@ -452,18 +486,29 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return (spans, classifier.identifier)
     }
 
-    /// Tries each classifier in turn until one succeeds
+    /// Tries each classifier in turn until one succeeds with a plausible result.
+    /// If they all find implausibly many ads, the last one's result is returned as suspect.
     @MainActor
-    private func classify(_ transcript: [TranscriptSegment], context: AdClassificationContext, using classifiers: [AdClassifier]) async throws -> ([AdSpan], AdClassifier) {
+    private func classify(_ transcript: [TranscriptSegment], context: AdClassificationContext, using classifiers: [AdClassifier]) async throws -> (spans: [AdSpan], classifier: AdClassifier, isSuspect: Bool) {
         var lastError: Error = AdSkippingError.noClassifier
+        var suspect: ([AdSpan], AdClassifier)?
         for classifier in classifiers {
             do {
-                return (try await classifier.adSpans(in: transcript, context: context), classifier)
+                let spans = try await classifier.adSpans(in: transcript, context: context)
+                guard EpisodeAdAnalysis.looksWrong(spans, duration: context.duration) else {
+                    return (spans, classifier, false)
+                }
+                FileLog.shared.addMessage("AdSkipping: \(classifier.identifier) found \(spans.count) ads, which looks wrong, trying the next classifier")
+                suspect = (spans, classifier)
             } catch {
                 try Task.checkCancellation()
                 FileLog.shared.addMessage("AdSkipping: \(classifier.identifier) failed, trying the next classifier: \(error)")
                 lastError = error
             }
+        }
+
+        if let (spans, classifier) = suspect {
+            return (spans, classifier, true)
         }
         throw lastError
     }

@@ -6697,6 +6697,9 @@
 /* Toast shown when playback automatically skips past an ad in the episode */
 "ad_skipping_skipped" = "Skipped ad";
 
+/* Toast shown when playback automatically skips past several ads in a row. %1$@ is the number of ads */
+"ad_skipping_skipped_plural" = "Skipped %1$@ ads";
+
 /* Button on the skipped ad toast that goes back and plays the ad */
 "ad_skipping_undo" = "Undo";
 
@@ -6804,3 +6807,6 @@
 
 /* Title of the screen, and the Profile and settings rows that open it, listing downloaded episodes and whether their ads have been found */
 "ad_scanning_title" = "Ad Scanning";
+
+/* Status of an episode where so many ads were found that the result can't be right, so none are skipped. %1$@ is the number of ads and %2$@ is their total length, like 12:30 */
+"ad_skipping_status_suspect" = "Looks wrong, not skipping: %1$@ ads · %2$@";

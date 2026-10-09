@@ -10,8 +10,8 @@ protocol EpisodeTranscriber {
 /// Transcribes on device with `SpeechAnalyzer` and `SpeechTranscriber`
 @available(iOS 26, *)
 struct SpeechAnalyzerTranscriber: EpisodeTranscriber {
-    /// Split long results so the classifier can place ad boundaries more precisely
-    private let maxSegmentDuration: TimeInterval = 15
+    /// Keep lines short so the classifier can place ad boundaries precisely
+    private let maxSegmentDuration: TimeInterval = 5
 
     @concurrent
     func transcribe(fileURL: URL, locale: Locale) async throws -> [TranscriptSegment] {
@@ -56,48 +56,28 @@ struct SpeechAnalyzerTranscriber: EpisodeTranscriber {
         return try await collector.value
     }
 
-    /// Splits a result into sentences using the per-word time ranges, falling back to the whole result
+    /// Pulls the timed words out of a result, falling back to one line for the whole result when it has no word timings
     private static func segments(from result: SpeechTranscriber.Result, maxDuration: TimeInterval) -> [TranscriptSegment] {
-        var segments: [TranscriptSegment] = []
-        var text = ""
-        var start: TimeInterval?
-        var end: TimeInterval?
-
-        func flush() {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty, let start, let end {
-                segments.append(TranscriptSegment(start: start, end: end, text: trimmed))
-            }
-            text = ""
-            start = nil
-            end = nil
-        }
+        var words: [TimedWord] = []
 
         for run in result.text.runs {
-            let piece = String(result.text[run.range].characters)
+            let piece = String(result.text[run.range].characters).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !piece.isEmpty else { continue }
+
             if let timeRange = run.audioTimeRange {
-                if start == nil {
-                    start = timeRange.start.seconds
-                }
-                end = timeRange.end.seconds
-            }
-            text += piece
-
-            let endsSentence = piece.trimmingCharacters(in: .whitespaces).last.map { ".?!".contains($0) } ?? false
-            let tooLong = (end ?? 0) - (start ?? 0) >= maxDuration
-            if endsSentence || tooLong {
-                flush()
-            }
-        }
-        flush()
-
-        if segments.isEmpty {
-            let wholeText = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !wholeText.isEmpty {
-                segments.append(TranscriptSegment(start: result.range.start.seconds, end: result.range.end.seconds, text: wholeText))
+                words.append(TimedWord(start: timeRange.start.seconds, end: timeRange.end.seconds, text: piece))
+            } else if let last = words.last {
+                // Punctuation can come without a time of its own, so it joins the word before it
+                words[words.count - 1] = TimedWord(start: last.start, end: last.end, text: last.text + piece)
             }
         }
 
-        return segments
+        if !words.isEmpty {
+            return TranscriptSegment.lines(from: words, maxDuration: maxDuration)
+        }
+
+        let wholeText = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !wholeText.isEmpty else { return [] }
+        return [TranscriptSegment(start: result.range.start.seconds, end: result.range.end.seconds, text: wholeText)]
     }
 }

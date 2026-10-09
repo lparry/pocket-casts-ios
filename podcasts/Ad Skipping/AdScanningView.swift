@@ -126,6 +126,9 @@ struct AdScanningView: View {
             guard let analysis else { return L10n.adSkippingStatusNotScanned }
 
             let adTime = analysis.spans.reduce(0) { $0 + $1.duration }
+            if analysis.isSuspect {
+                return L10n.adSkippingStatusSuspect(analysis.spans.count.localized(), format(adTime))
+            }
             return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime), AdSkippingSettingsView.displayName(forClassifier: analysis.classifier))
         case .some(let status):
             return status.description

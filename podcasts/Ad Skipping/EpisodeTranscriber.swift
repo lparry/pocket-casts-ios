@@ -4,7 +4,8 @@ import Speech
 
 /// Turns a local audio file into timestamped transcript lines
 protocol EpisodeTranscriber {
-    func transcribe(fileURL: URL, locale: Locale) async throws -> [TranscriptSegment]
+    /// `progress` is called with how far through the audio the transcript has got, from 0 to 1
+    func transcribe(fileURL: URL, locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws -> [TranscriptSegment]
 }
 
 /// Transcribes on device with `SpeechAnalyzer` and `SpeechTranscriber`
@@ -14,7 +15,7 @@ struct SpeechAnalyzerTranscriber: EpisodeTranscriber {
     private let maxSegmentDuration: TimeInterval = 5
 
     @concurrent
-    func transcribe(fileURL: URL, locale: Locale) async throws -> [TranscriptSegment] {
+    func transcribe(fileURL: URL, locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws -> [TranscriptSegment] {
         guard SpeechTranscriber.isAvailable else {
             throw AdSkippingError.transcriptionUnavailable
         }
@@ -30,13 +31,18 @@ struct SpeechAnalyzerTranscriber: EpisodeTranscriber {
         }
 
         let audioFile = try AVAudioFile(forReading: fileURL)
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let audioDuration = Double(audioFile.length) / audioFile.processingFormat.sampleRate
+        // Keep the model loaded between episodes, and don't let a background scan crawl
+        let analyzer = SpeechAnalyzer(modules: [transcriber], options: SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .lingering))
 
         let maxSegmentDuration = maxSegmentDuration
         let collector = Task {
             var segments: [TranscriptSegment] = []
             for try await result in transcriber.results where result.isFinal {
                 segments.append(contentsOf: Self.segments(from: result, maxDuration: maxSegmentDuration))
+                if audioDuration > 0 {
+                    progress(min(1, result.range.end.seconds / audioDuration))
+                }
             }
             return segments
         }

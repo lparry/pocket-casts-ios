@@ -6772,6 +6772,12 @@
 /* Status while an episode is being transcribed on device */
 "ad_skipping_status_transcribing" = "Transcribing…";
 
+/* Status while an episode is being transcribed on device. %1$@ is how far through it is, like 43% */
+"ad_skipping_status_transcribing_progress" = "Transcribing… %1$@";
+
+/* Status while an episode is being transcribed on device. %1$@ is how far through it is, like 43%, and %2$@ is roughly how long is left, like 1:20 */
+"ad_skipping_status_transcribing_time_left" = "Transcribing… %1$@ · about %2$@ left";
+
 /* Status while a model is finding the ads in an episode's transcript */
 "ad_skipping_status_classifying" = "Finding ads…";
 
@@ -6810,3 +6816,12 @@
 
 /* Status of an episode where so many ads were found that the result can't be right, so none are skipped. %1$@ is the number of ads and %2$@ is their total length, like 12:30 */
 "ad_skipping_status_suspect" = "Looks wrong, not skipping: %1$@ ads · %2$@";
+
+/* How long an episode took to transcribe. %1$@ is the length of the audio, like 26:00, %2$@ is how long it took, like 1:12, and %3$@ is how many times faster than real time that was, like 21.7 */
+"ad_scanning_timings_transcribed" = "Transcribed %1$@ of audio in %2$@ (%3$@× real time)";
+
+/* Shown instead of the transcription time when an episode's saved transcript was used again */
+"ad_scanning_timings_reused" = "Reused the saved transcript";
+
+/* How long the rest of a scan took. %1$@ is finding the ads, %2$@ is placing their edges on exact words, and %3$@ is lining the edges up with the audio, each like 0:08 */
+"ad_scanning_timings_steps" = "Finding ads %1$@ · Edges %2$@ · Audio %3$@";

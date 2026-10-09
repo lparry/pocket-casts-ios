@@ -16,8 +16,9 @@ protocol AdClassifier {
 
     func adSpans(in transcript: [TranscriptSegment], context: AdClassificationContext) async throws -> [AdSpan]
 
-    /// Which word in `request.words` is the ad's first (for `.start`) or last (for `.end`), or nil if it isn't in them
-    func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int?
+    /// For each request, which word in its `words` is the ad's first (for `.start`) or last (for `.end`), or nil if it
+    /// isn't in them. An episode's edges all come at once, so a remote classifier can answer them in one call.
+    func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?]
 }
 
 enum AdBoundaryEdge {
@@ -90,6 +91,19 @@ enum AdClassifierPrompt {
     from". For the end of an ad, give the index of its last word. Outros are part of the ad too: "now back to the \
     show", "thanks to our sponsor", a promo code or web address. Give -1 if the edge isn't in these words.
     """
+
+    static let batchedBoundaryInstructions = boundaryInstructions + """
+
+
+    You'll get several edges at once, each in its own `<edge>` element with its own word indexes. Answer every edge, by \
+    its `id`.
+    """
+
+    static func boundaryPrompt(for requests: [AdBoundaryRequest]) -> String {
+        requests.enumerated().map { id, request in
+            "<edge id=\"\(id)\">\n\(boundaryPrompt(for: request))\n</edge>"
+        }.joined(separator: "\n\n")
+    }
 
     static func boundaryPrompt(for request: AdBoundaryRequest) -> String {
         let task = switch request.edge {

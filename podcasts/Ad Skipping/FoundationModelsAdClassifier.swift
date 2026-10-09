@@ -50,11 +50,26 @@ struct FoundationModelsAdClassifier: AdClassifier {
         return cleanedUp(spans, duration: context.duration)
     }
 
-    func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int? {
+    /// The on-device context only fits one edge's words, so each gets its own session. An edge that fails is left as it was.
+    func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?] {
         guard model.isAvailable else {
             throw AdSkippingError.classifierFailed(Self.unavailableDescription(model.availability))
         }
 
+        var indices: [Int?] = []
+        for request in requests {
+            do {
+                indices.append(try await boundaryWordIndex(for: request))
+            } catch {
+                try Task.checkCancellation()
+                FileLog.shared.addMessage("FoundationModelsAdClassifier: couldn't place an edge at \(request.edge == .start ? request.ad.start : request.ad.end)s: \(error)")
+                indices.append(nil)
+            }
+        }
+        return indices
+    }
+
+    private func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int? {
         let session = LanguageModelSession(model: model, instructions: AdClassifierPrompt.boundaryInstructions)
         let response = try await session.respond(to: AdClassifierPrompt.boundaryPrompt(for: request),
                                                  generating: OnDeviceAdBoundary.self,

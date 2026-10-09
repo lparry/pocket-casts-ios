@@ -22,10 +22,17 @@ struct OpenRouterAdClassifier: AdClassifier {
         return cleanedUp(spans, duration: context.duration)
     }
 
-    func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int? {
-        let content = try await complete(Self.boundaryRequestBody(model: model, request: request))
+    func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?] {
+        guard !requests.isEmpty else { return [] }
+
+        let content = try await complete(Self.boundaryRequestBody(model: model, requests: requests))
         let output = try JSONDecoder().decode(BoundaryOutput.self, from: content)
-        return output.wordIndex >= 0 ? output.wordIndex : nil
+
+        var indices = [Int?](repeating: nil, count: requests.count)
+        for edge in output.edges where indices.indices.contains(edge.id) && edge.wordIndex >= 0 {
+            indices[edge.id] = edge.wordIndex
+        }
+        return indices
     }
 
     /// Sends a chat completion and returns the model's JSON content
@@ -79,13 +86,13 @@ struct OpenRouterAdClassifier: AdClassifier {
              maxTokens: 16000)
     }
 
-    static func boundaryRequestBody(model: String, request: AdBoundaryRequest) -> [String: Any] {
+    static func boundaryRequestBody(model: String, requests: [AdBoundaryRequest]) -> [String: Any] {
         body(model: model,
-             system: AdClassifierPrompt.boundaryInstructions,
-             user: AdClassifierPrompt.boundaryPrompt(for: request),
-             schemaName: "ad_boundary",
+             system: AdClassifierPrompt.batchedBoundaryInstructions,
+             user: AdClassifierPrompt.boundaryPrompt(for: requests),
+             schemaName: "ad_boundaries",
              schema: boundarySchema,
-             maxTokens: 4000)
+             maxTokens: 16000)
     }
 
     private static func body(model: String, system: String, user: String, schemaName: String, schema: [String: Any], maxTokens: Int) -> [String: Any] {
@@ -112,9 +119,20 @@ struct OpenRouterAdClassifier: AdClassifier {
     private static let boundarySchema: [String: Any] = [
         "type": "object",
         "properties": [
-            "word_index": ["type": "integer"]
+            "edges": [
+                "type": "array",
+                "items": [
+                    "type": "object",
+                    "properties": [
+                        "id": ["type": "integer"],
+                        "word_index": ["type": "integer"]
+                    ],
+                    "required": ["id", "word_index"],
+                    "additionalProperties": false
+                ]
+            ]
         ],
-        "required": ["word_index"],
+        "required": ["edges"],
         "additionalProperties": false
     ]
 
@@ -166,11 +184,17 @@ struct OpenRouterAdClassifier: AdClassifier {
     }
 
     private struct BoundaryOutput: Decodable {
-        let wordIndex: Int
+        struct Edge: Decodable {
+            let id: Int
+            let wordIndex: Int
 
-        enum CodingKeys: String, CodingKey {
-            case wordIndex = "word_index"
+            enum CodingKeys: String, CodingKey {
+                case id
+                case wordIndex = "word_index"
+            }
         }
+
+        let edges: [Edge]
     }
 
     private struct ClassifierOutput: Decodable {

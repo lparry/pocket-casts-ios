@@ -52,8 +52,14 @@ struct AdScanningView: View {
     private func row(for episode: BaseEpisode) -> some View {
         let analysis = manager.currentAnalysis(for: episode)
 
-        if let analysis, !analysis.spans.isEmpty {
+        if let analysis, !analysis.spans.isEmpty || analysis.timings != nil {
             DisclosureGroup {
+                if let timings = analysis.timings {
+                    Text(timingsDescription(timings))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 ForEach(analysis.spans, id: \.self) { span in
                     VStack(alignment: .leading) {
                         Text(L10n.adSkippingSpanRange(format(span.start), format(span.end)))
@@ -133,6 +139,15 @@ struct AdScanningView: View {
         case .some(let status):
             return status.description
         }
+    }
+
+    private func timingsDescription(_ timings: AdScanTimings) -> String {
+        let transcription = if let transcription = timings.transcription, let speed = timings.transcriptionSpeed {
+            L10n.adScanningTimingsTranscribed(format(timings.audioDuration ?? 0), format(transcription), speed.localized())
+        } else {
+            L10n.adScanningTimingsReused
+        }
+        return transcription + "\n" + L10n.adScanningTimingsSteps(format(timings.firstPass), format(timings.edgePass), format(timings.audioSnapping))
     }
 
     private func format(_ time: TimeInterval) -> String {

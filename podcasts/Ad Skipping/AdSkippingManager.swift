@@ -1,3 +1,4 @@
+import AVFoundation
 import BackgroundTasks
 import Combine
 import Foundation
@@ -24,7 +25,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     enum Status: Equatable {
         case queued
-        case transcribing
+        /// `progress` runs from 0 to 1, once the first part of the transcript is in
+        case transcribing(progress: Double?, timeLeft: TimeInterval?)
         case classifying
         case finished(adCount: Int, classifier: String)
         case failed(String)
@@ -39,6 +41,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     @Published private(set) var analysesVersion = 0
 
     let store: AdSpanStore
+    private let transcriptStore: TranscriptStore
 
     private let transcriberProvider: () -> EpisodeTranscriber?
     private let classifiersProvider: (_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier]
@@ -73,10 +76,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     private let playbackState = OSAllocatedUnfairLock(initialState: PlaybackState())
 
     init(store: AdSpanStore = AdSpanStore(),
+         transcriptStore: TranscriptStore = TranscriptStore(),
          dataManager: DataManager = .shared,
          transcriberProvider: (() -> EpisodeTranscriber?)? = nil,
          classifiersProvider: ((_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier])? = nil) {
         self.store = store
+        self.transcriptStore = transcriptStore
         self.dataManager = dataManager
         self.transcriberProvider = transcriberProvider ?? {
             if #available(iOS 26, *) {
@@ -340,7 +345,10 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     func scanMissing(includingFailed: Bool = false) {
         guard FeatureFlag.autoAdSkip.enabled else { return }
 
-        let episodes = downloadedEpisodes().filter { isScanning($0) }
+        let downloaded = downloadedEpisodes()
+        transcriptStore.removeAll(except: Set(downloaded.map(\.uuid)))
+
+        let episodes = downloaded.filter { isScanning($0) }
         let scanned = Set(episodes.filter { currentAnalysis(for: $0) != nil }.map(\.uuid))
         let upNext = PlaybackManager.shared.queue.allEpisodes(includeNowPlaying: true).map(\.uuid)
         let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: upNext)
@@ -441,17 +449,36 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             throw AdSkippingError.noClassifier
         }
 
-        guard let transcriber = transcriberProvider() else {
-            throw AdSkippingError.transcriptionUnavailable
-        }
-
         let fileURL = URL(fileURLWithPath: episode.pathToDownloadedFile(pathFinder: DownloadManager.shared))
         let fileSize = Self.fileSize(of: episode)
+        let clock = ContinuousClock()
+        var timings = AdScanTimings()
 
-        statuses[uuid] = .transcribing
-        // Podcasts don't record their language, so assume they're in the listener's
-        let transcript = try await transcriber.transcribe(fileURL: fileURL, locale: Locale.current)
-        try Task.checkCancellation()
+        let transcript: [TranscriptSegment]
+        if let saved = transcriptStore.transcript(for: uuid, audioFileSize: fileSize) {
+            transcript = saved.segments
+            timings.audioDuration = saved.audioDuration
+        } else {
+            guard let transcriber = transcriberProvider() else {
+                throw AdSkippingError.transcriptionUnavailable
+            }
+
+            statuses[uuid] = .transcribing(progress: nil, timeLeft: nil)
+            let audioDuration = Self.audioDuration(of: fileURL)
+            let started = clock.now
+            // Podcasts don't record their language, so assume they're in the listener's
+            transcript = try await transcriber.transcribe(fileURL: fileURL, locale: Locale.current) { [weak self] progress in
+                Task { @MainActor in
+                    self?.transcriptionProgressed(uuid, progress: progress, since: started, clock: clock)
+                }
+            }
+            try Task.checkCancellation()
+
+            timings.audioDuration = audioDuration
+            timings.transcription = (clock.now - started).seconds
+            try? transcriptStore.save(transcript, for: uuid, audioFileSize: fileSize, audioDuration: audioDuration)
+        }
+
         guard !transcript.isEmpty else {
             throw AdSkippingError.emptyTranscript
         }
@@ -461,15 +488,25 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         // The episode's duration isn't always known yet, but the transcript runs nearly to the end
         let duration = episode.duration > 0 ? episode.duration : transcript.last?.end ?? 0
         let context = AdClassificationContext(podcastTitle: podcastTitle, episodeTitle: episode.title, duration: duration)
+
+        var started = clock.now
         let (foundSpans, classifier, isSuspect) = try await classify(transcript, context: context, using: classifiers)
         try Task.checkCancellation()
+        timings.firstPass = (clock.now - started).seconds
 
         // Pin each edge to the exact word, then widen it over any jingle or pause in the audio
         let words = transcript.flatMap(\.words)
+        started = clock.now
         let refinedSpans = await AdBoundaryRefiner(classifier: classifier).refine(foundSpans, words: words, context: context)
         try Task.checkCancellation()
+        timings.edgePass = (clock.now - started).seconds
+
+        started = clock.now
         let snappedSpans = await AudioBoundarySnapper.snap(refinedSpans, words: words, fileURL: fileURL)
+        timings.audioSnapping = (clock.now - started).seconds
         let spans = classifier.cleanedUp(snappedSpans, duration: context.duration)
+
+        FileLog.shared.addMessage("AdSkipping: timings for \(uuid): \(timings.logDescription)")
 
         let analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion,
                                          episodeUuid: uuid,
@@ -478,7 +515,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
                                          audioFileSize: fileSize,
                                          transcriptSegmentCount: transcript.count,
                                          spans: spans,
-                                         isSuspect: isSuspect)
+                                         isSuspect: isSuspect,
+                                         timings: timings)
         try store.save(analysis)
         forgetFileMatch(for: uuid)
         analysesVersion += 1
@@ -511,6 +549,21 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             return (spans, classifier, true)
         }
         throw lastError
+    }
+
+    @MainActor
+    private func transcriptionProgressed(_ uuid: String, progress: Double, since started: ContinuousClock.Instant, clock: ContinuousClock) {
+        // Updates can arrive after the transcript is done
+        guard case .transcribing = statuses[uuid] else { return }
+
+        let elapsed = (clock.now - started).seconds
+        let timeLeft = progress > 0.02 ? elapsed * (1 - progress) / progress : nil
+        statuses[uuid] = .transcribing(progress: progress, timeLeft: timeLeft)
+    }
+
+    private static func audioDuration(of fileURL: URL) -> TimeInterval? {
+        guard let file = try? AVAudioFile(forReading: fileURL) else { return nil }
+        return Double(file.length) / file.processingFormat.sampleRate
     }
 
     private static func fileSize(of episode: BaseEpisode) -> UInt64? {
@@ -586,5 +639,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 private extension String {
     var nilIfEmptyString: String? {
         isEmpty ? nil : self
+    }
+}
+
+private extension Duration {
+    var seconds: TimeInterval {
+        let (seconds, attoseconds) = components
+        return TimeInterval(seconds) + TimeInterval(attoseconds) / 1e18
     }
 }

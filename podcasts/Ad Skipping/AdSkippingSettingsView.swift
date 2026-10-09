@@ -112,6 +112,10 @@ extension AdSkippingManager.Status: CustomStringConvertible {
         switch self {
         case .queued:
             L10n.adSkippingStatusQueued
+        case .transcribing(let progress?, let timeLeft?):
+            L10n.adSkippingStatusTranscribingTimeLeft(progress.localized(.percent), TimeFormatter.shared.playTimeFormat(time: timeLeft))
+        case .transcribing(let progress?, nil):
+            L10n.adSkippingStatusTranscribingProgress(progress.localized(.percent))
         case .transcribing:
             L10n.adSkippingStatusTranscribing
         case .classifying:

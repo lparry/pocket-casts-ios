@@ -58,14 +58,14 @@ struct AdSkip: Equatable {
 }
 
 /// One word of an on-device transcript, with when it was spoken
-struct TimedWord: Equatable {
+struct TimedWord: Codable, Equatable {
     let start: TimeInterval
     let end: TimeInterval
     let text: String
 }
 
 /// One timestamped line of an on-device transcript
-struct TranscriptSegment: Equatable {
+struct TranscriptSegment: Codable, Equatable {
     let start: TimeInterval
     let end: TimeInterval
     let text: String
@@ -120,6 +120,33 @@ struct EpisodeAdAnalysis: Codable, Equatable {
     let spans: [AdSpan]
     /// Set when the spans look implausible, so they're shown but never skipped
     var isSuspect = false
+    /// How long each step of the scan took
+    var timings: AdScanTimings?
+}
+
+/// How long each step of a scan took, to see where the time goes
+struct AdScanTimings: Codable, Equatable {
+    /// How much audio there was
+    var audioDuration: TimeInterval?
+    /// Nil when a saved transcript was reused
+    var transcription: TimeInterval?
+    var firstPass: TimeInterval = 0
+    var edgePass: TimeInterval = 0
+    var audioSnapping: TimeInterval = 0
+
+    /// How many seconds of audio were transcribed each second
+    var transcriptionSpeed: Double? {
+        guard let audioDuration, let transcription, transcription > 0 else { return nil }
+        return audioDuration / transcription
+    }
+    var logDescription: String {
+        let transcribed = if let transcription {
+            String(format: "transcribed %.0fs of audio in %.1fs (%.1fx)", audioDuration ?? 0, transcription, transcriptionSpeed ?? 0)
+        } else {
+            "reused the saved transcript"
+        }
+        return transcribed + String(format: ", first pass %.1fs, edge pass %.1fs, audio snapping %.1fs", firstPass, edgePass, audioSnapping)
+    }
 }
 
 extension EpisodeAdAnalysis {

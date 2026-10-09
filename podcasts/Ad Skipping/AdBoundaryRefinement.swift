@@ -11,28 +11,37 @@ struct AdBoundaryRefiner {
     let classifier: AdClassifier
 
     func refine(_ spans: [AdSpan], words: [TimedWord], context: AdClassificationContext) async -> [AdSpan] {
-        var refined: [AdSpan] = []
-        for span in spans {
-            let start = await refinedTime(for: .start, of: span, words: words, context: context) ?? span.start
-            let end = await refinedTime(for: .end, of: span, words: words, context: context) ?? span.end
-
-            // Keep the original if the refined edges don't make sense together
-            refined.append(end > start ? AdSpan(start: start, end: end, kind: span.kind, sponsor: span.sponsor) : span)
+        let requests = spans.flatMap { span in
+            [AdBoundaryEdge.start, .end].map { edge in
+                AdBoundaryRequest(edge: edge, ad: span, words: Self.window(around: edge == .start ? span.start : span.end, in: words), context: context)
+            }
         }
-        return refined
-    }
+        let askable = requests.filter { !$0.words.isEmpty }
+        guard !askable.isEmpty else { return spans }
 
-    private func refinedTime(for edge: AdBoundaryEdge, of span: AdSpan, words: [TimedWord], context: AdClassificationContext) async -> TimeInterval? {
-        let time = edge == .start ? span.start : span.end
-        let window = Self.window(around: time, in: words)
-        guard !window.isEmpty else { return nil }
-
+        let answers: [Int?]
         do {
-            let index = try await classifier.boundaryWordIndex(for: AdBoundaryRequest(edge: edge, ad: span, words: window, context: context))
-            return Self.time(of: edge, wordAt: index, in: window)
+            answers = try await classifier.boundaryWordIndices(for: askable)
         } catch {
-            FileLog.shared.addMessage("AdBoundaryRefiner: couldn't refine the \(edge) at \(time)s: \(error)")
-            return nil
+            FileLog.shared.addMessage("AdBoundaryRefiner: couldn't refine \(spans.count) ads: \(error)")
+            return spans
+        }
+
+        // Look up each answer by its request, since requests without words weren't asked
+        var times: [Int: TimeInterval] = [:]
+        var askedIndex = 0
+        for (index, request) in requests.enumerated() where !request.words.isEmpty {
+            if askedIndex < answers.count {
+                times[index] = Self.time(of: request.edge, wordAt: answers[askedIndex], in: request.words)
+            }
+            askedIndex += 1
+        }
+
+        return spans.enumerated().map { index, span in
+            let start = times[index * 2] ?? span.start
+            let end = times[index * 2 + 1] ?? span.end
+            // Keep the original if the refined edges don't make sense together
+            return end > start ? AdSpan(start: start, end: end, kind: span.kind, sponsor: span.sponsor) : span
         }
     }
 

@@ -49,23 +49,30 @@ final class OpenRouterAdClassifierTests: XCTestCase {
         XCTAssertTrue(prompt.contains("[4.5-30.0] This episode is brought to you by Acme."))
     }
 
-    func testAsksForTheExactBoundaryWord() async throws {
+    func testAsksForEveryBoundaryWordInOneRequest() async throws {
+        var requestCount = 0
         var receivedBody: [String: Any]?
         OpenRouterURLProtocol.requestHandler = { request in
+            requestCount += 1
             receivedBody = try JSONSerialization.jsonObject(with: request.bodyData) as? [String: Any]
-            return Self.success(content: #"{"word_index": 1}"#)
+            return Self.success(content: #"{"edges": [{"id": 1, "word_index": 0}, {"id": 0, "word_index": 1}, {"id": 7, "word_index": 0}]}"#)
         }
-        let request = AdBoundaryRequest(edge: .start,
-                                        ad: AdSpan(start: 79.3, end: 107.7, kind: .inserted, sponsor: "Bank"),
-                                        words: [TimedWord(start: 76.3, end: 77, text: "courtroom."), TimedWord(start: 79.32, end: 79.62, text: "Your")],
-                                        context: context)
+        let ad = AdSpan(start: 79.3, end: 107.7, kind: .inserted, sponsor: "Bank")
+        let requests = [
+            AdBoundaryRequest(edge: .start, ad: ad, words: [TimedWord(start: 76.3, end: 77, text: "courtroom."), TimedWord(start: 79.32, end: 79.62, text: "Your")], context: context),
+            AdBoundaryRequest(edge: .end, ad: ad, words: [TimedWord(start: 107, end: 107.7, text: "Australia.")], context: context),
+            AdBoundaryRequest(edge: .start, ad: ad, words: [TimedWord(start: 110.3, end: 110.6, text: "Full")], context: context)
+        ]
 
-        let index = try await makeClassifier().boundaryWordIndex(for: request)
+        let indices = try await makeClassifier().boundaryWordIndices(for: requests)
 
-        XCTAssertEqual(index, 1)
+        // Answers are matched by id, and an edge without an answer is nil
+        XCTAssertEqual(indices, [1, 0, nil])
+        XCTAssertEqual(requestCount, 1)
         let prompt = try XCTUnwrap((receivedBody?["messages"] as? [[String: Any]])?.last?["content"] as? String)
-        XCTAssertTrue(prompt.contains("Which word starts this ad?"))
+        XCTAssertTrue(prompt.contains("<edge id=\"0\">\nWhich word starts this ad?"))
         XCTAssertTrue(prompt.contains("1 [79.32] Your"))
+        XCTAssertTrue(prompt.contains("<edge id=\"1\">\nWhich word ends this ad?"))
     }
 
     func testCleansUpSpans() async throws {
@@ -343,9 +350,13 @@ final class AdBoundaryRefinerTests: XCTestCase {
             return request.edge == .start ? middle - 3 : middle + 2
         }
 
-        let refined = await AdBoundaryRefiner(classifier: classifier).refine([AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil)], words: words, context: context)
+        let spans = [AdSpan(start: 20, end: 40, kind: .inserted, sponsor: nil), AdSpan(start: 45, end: 55, kind: .hostRead, sponsor: nil)]
 
-        XCTAssertEqual(refined, [AdSpan(start: 17, end: 42.8, kind: .inserted, sponsor: nil)])
+        let refined = await AdBoundaryRefiner(classifier: classifier).refine(spans, words: words, context: context)
+
+        XCTAssertEqual(refined, [AdSpan(start: 17, end: 42.8, kind: .inserted, sponsor: nil), AdSpan(start: 42, end: 57.8, kind: .hostRead, sponsor: nil)])
+        // Every edge goes in one request
+        XCTAssertEqual(classifier.requestCounter.count, 1)
     }
 
     func testKeepsEdgesTheClassifierCantPlace() async {
@@ -360,8 +371,13 @@ final class AdBoundaryRefinerTests: XCTestCase {
         XCTAssertEqual(failing, [span])
     }
 
+    private final class Counter {
+        var count = 0
+    }
+
     private struct FakeClassifier: AdClassifier {
         let boundary: (AdBoundaryRequest) throws -> Int?
+        var requestCounter = Counter()
 
         var identifier: String {
             "fake"
@@ -371,8 +387,9 @@ final class AdBoundaryRefinerTests: XCTestCase {
             []
         }
 
-        func boundaryWordIndex(for request: AdBoundaryRequest) async throws -> Int? {
-            try boundary(request)
+        func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?] {
+            requestCounter.count += 1
+            return try requests.map(boundary)
         }
     }
 }
@@ -460,6 +477,51 @@ final class AdSkippingPodcastSettingTests: XCTestCase {
 
         manager.setScanning(true, podcastUuid: "podcast")
         XCTAssertTrue(manager.isScanning(podcastUuid: "podcast"))
+    }
+}
+
+final class TranscriptStoreTests: XCTestCase {
+    private var directory: URL!
+
+    private let transcript = [
+        TranscriptSegment(start: 0, end: 1, text: "Hello there.", words: [TimedWord(start: 0, end: 0.5, text: "Hello"), TimedWord(start: 0.5, end: 1, text: "there.")])
+    ]
+
+    override func setUp() {
+        super.setUp()
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: directory)
+        super.tearDown()
+    }
+
+    func testReusesTheTranscriptForTheSameFile() throws {
+        try TranscriptStore(directory: directory).save(transcript, for: "episode", audioFileSize: 100, audioDuration: 1)
+
+        let saved = TranscriptStore(directory: directory).transcript(for: "episode", audioFileSize: 100)
+
+        XCTAssertEqual(saved?.segments, transcript)
+        XCTAssertEqual(saved?.audioDuration, 1)
+    }
+
+    func testIgnoresTheTranscriptOfADifferentDownload() throws {
+        let store = TranscriptStore(directory: directory)
+        try store.save(transcript, for: "episode", audioFileSize: 100, audioDuration: 1)
+
+        XCTAssertNil(store.transcript(for: "episode", audioFileSize: 200))
+    }
+
+    func testDeletesTranscriptsOfEpisodesThatArentDownloaded() throws {
+        let store = TranscriptStore(directory: directory)
+        try store.save(transcript, for: "kept", audioFileSize: 100, audioDuration: 1)
+        try store.save(transcript, for: "deleted", audioFileSize: 100, audioDuration: 1)
+
+        store.removeAll(except: ["kept"])
+
+        XCTAssertNotNil(store.transcript(for: "kept", audioFileSize: 100))
+        XCTAssertNil(store.transcript(for: "deleted", audioFileSize: 100))
     }
 }
 

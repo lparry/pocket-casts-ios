@@ -6823,8 +6823,14 @@
 /* Shown instead of the transcription time when an episode's saved transcript was used again */
 "ad_scanning_timings_reused" = "Reused the saved transcript";
 
-/* How long the rest of a scan took. %1$@ is finding the ads, %2$@ is placing their edges on exact words, and %3$@ is lining the edges up with the audio, each like 0:08 */
-"ad_scanning_timings_steps" = "Finding ads %1$@ · Edges %2$@ · Audio %3$@";
+/* How long the rest of a scan took. %1$@ is finding the ads, %2$@ is placing their edges on exact words, and %3$@ is moving the edges onto nearby silences in the audio, each like 8.2s or 1:05 */
+"ad_scanning_timings_steps" = "Find ads %1$@ · Refine edges %2$@ · Snap to audio %3$@";
+
+/* How many of the ads' edges were moved onto a silence or a change in loudness in the audio. %1$@ is how many moved and %2$@ is how many edges there are, like 5 of 8 */
+"ad_scanning_timings_snapped_edges" = "%1$@ of %2$@ edges snapped to the audio";
+
+/* Shown when the episode's audio couldn't be read, so the ads' edges couldn't be lined up with it */
+"ad_scanning_timings_audio_unreadable" = "Couldn't read the audio to snap edges";
 
 /* Header of the ad skipping settings section that limits which downloads are scanned, to keep down the cost and battery use */
 "ad_skipping_limits_header" = "Limits";

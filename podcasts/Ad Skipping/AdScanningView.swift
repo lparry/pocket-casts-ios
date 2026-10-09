@@ -243,11 +243,29 @@ struct AdScanningView: View {
 
     private func timingsDescription(_ timings: AdScanTimings) -> String {
         let transcription = if let transcription = timings.transcription, let speed = timings.transcriptionSpeed {
-            L10n.adScanningTimingsTranscribed(format(timings.audioDuration ?? 0), format(transcription), speed.localized())
+            L10n.adScanningTimingsTranscribed(format(timings.audioDuration ?? 0), Self.formatTimeTaken(transcription), speed.localized())
         } else {
             L10n.adScanningTimingsReused
         }
-        return transcription + "\n" + L10n.adScanningTimingsSteps(format(timings.firstPass), format(timings.edgePass), format(timings.audioSnapping))
+        let steps = L10n.adScanningTimingsSteps(Self.formatTimeTaken(timings.firstPass), Self.formatTimeTaken(timings.edgePass), Self.formatTimeTaken(timings.audioSnapping))
+
+        let snapping: String? = if timings.audioUnreadable == true {
+            L10n.adScanningTimingsAudioUnreadable
+        } else if let snappedEdges = timings.snappedEdges, let edgeCount = timings.edgeCount, edgeCount > 0 {
+            L10n.adScanningTimingsSnappedEdges(snappedEdges.localized(), edgeCount.localized())
+        } else {
+            nil
+        }
+
+        return ([transcription, steps] + [snapping].compactMap { $0 }).joined(separator: "\n")
+    }
+
+    /// How long a step took. Some take well under a second, which would round to 0:00 as a play time, so those are
+    /// shown in seconds, like 0.4s.
+    static func formatTimeTaken(_ time: TimeInterval) -> String {
+        guard time < 60 else { return TimeFormatter.shared.playTimeFormat(time: time) }
+        return Measurement(value: time, unit: UnitDuration.seconds)
+            .formatted(.measurement(width: .narrow, numberFormatStyle: .number.precision(.fractionLength(time < 10 ? 1 : 0))))
     }
 
     private func format(_ time: TimeInterval) -> String {

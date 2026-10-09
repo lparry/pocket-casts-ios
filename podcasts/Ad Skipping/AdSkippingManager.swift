@@ -853,8 +853,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         timings.edgePass = (clock.now - started).seconds
 
         started = clock.now
-        let snappedSpans = await AudioBoundarySnapper.snap(refinedSpans, words: words, fileURL: fileURL)
+        let snapped = await AudioBoundarySnapper.snap(refinedSpans, words: words, fileURL: fileURL)
+        let snappedSpans = snapped.spans
         timings.audioSnapping = (clock.now - started).seconds
+        timings.snappedEdges = snapped.movedEdges
+        timings.edgeCount = refinedSpans.count * 2
+        timings.audioUnreadable = !snapped.couldReadFile
         let spans = classifier.cleanedUp(snappedSpans, duration: context.duration)
 
         FileLog.shared.addMessage("AdSkipping: timings for \(uuid): \(timings.logDescription)")

@@ -712,6 +712,37 @@ final class TranscriptStoreTests: XCTestCase {
     }
 }
 
+final class AdScanTimingsTests: XCTestCase {
+    func testShowsStepsUnderAMinuteInSeconds() {
+        XCTAssertTrue(AdScanningView.formatTimeTaken(0.04).contains("0"))
+        XCTAssertFalse(AdScanningView.formatTimeTaken(0.4).contains(":"), "Not rounded to 0:00")
+        XCTAssertTrue(AdScanningView.formatTimeTaken(0.4).contains("0.4"))
+        XCTAssertTrue(AdScanningView.formatTimeTaken(12.3).contains("12"))
+        XCTAssertTrue(AdScanningView.formatTimeTaken(65).contains(":"))
+    }
+
+    func testReadsTimingsSavedBeforeEdgesWereCounted() throws {
+        let json = #"{"audioDuration":1800,"transcription":60,"firstPass":20,"edgePass":8,"audioSnapping":0.2}"#
+
+        let timings = try JSONDecoder().decode(AdScanTimings.self, from: Data(json.utf8))
+
+        XCTAssertEqual(timings.audioSnapping, 0.2)
+        XCTAssertNil(timings.snappedEdges)
+        XCTAssertNil(timings.edgeCount)
+        XCTAssertNil(timings.audioUnreadable)
+    }
+
+    func testSaysWhenTheAudioCouldntBeRead() async {
+        let ad = AdSpan(start: 10, end: 40, kind: .inserted, sponsor: nil)
+
+        let result = await AudioBoundarySnapper.snap([ad], words: [], fileURL: URL(fileURLWithPath: "/nonexistent/episode.mp3"))
+
+        XCTAssertFalse(result.couldReadFile)
+        XCTAssertEqual(result.movedEdges, 0)
+        XCTAssertEqual(result.spans, [ad])
+    }
+}
+
 final class AdScanLimitTests: XCTestCase {
     private let charging = AdSkippingManager.ScanConditions(isCharging: true, isLowPowerMode: false, isHot: false)
     private let onBattery = AdSkippingManager.ScanConditions(isCharging: false, isLowPowerMode: false, isHot: false)

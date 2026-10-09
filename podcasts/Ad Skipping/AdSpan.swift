@@ -140,6 +140,11 @@ struct AdScanTimings: Codable, Equatable {
     var firstPass: TimeInterval = 0
     var edgePass: TimeInterval = 0
     var audioSnapping: TimeInterval = 0
+    /// How many ad edges moved onto a silence or change in loudness, out of `edgeCount`. Nil in scans from before it was kept.
+    var snappedEdges: Int?
+    var edgeCount: Int?
+    /// Set when the audio couldn't be read, so no edges were moved
+    var audioUnreadable: Bool?
 
     /// How many seconds of audio were transcribed each second
     var transcriptionSpeed: Double? {
@@ -152,7 +157,14 @@ struct AdScanTimings: Codable, Equatable {
         } else {
             "reused the saved transcript"
         }
-        return transcribed + String(format: ", first pass %.1fs, edge pass %.1fs, audio snapping %.1fs", firstPass, edgePass, audioSnapping)
+        let snapping = if audioUnreadable == true {
+            " (couldn't read the audio)"
+        } else if let snappedEdges, let edgeCount {
+            " (moved \(snappedEdges) of \(edgeCount) edges)"
+        } else {
+            ""
+        }
+        return transcribed + String(format: ", first pass %.1fs, edge pass %.1fs, audio snapping %.1fs", firstPass, edgePass, audioSnapping) + snapping
     }
 }
 

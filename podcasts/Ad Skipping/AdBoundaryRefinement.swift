@@ -71,15 +71,29 @@ enum AudioBoundarySnapper {
     /// The length of each loudness measurement
     static let blockDuration: TimeInterval = 0.02
 
-    @concurrent
-    static func snap(_ spans: [AdSpan], words: [TimedWord], fileURL: URL) async -> [AdSpan] {
-        guard let file = try? AVAudioFile(forReading: fileURL) else { return spans }
+    /// The snapped spans, and what happened, so the Ad Scanning screen can show whether the audio helped
+    struct Result {
+        let spans: [AdSpan]
+        /// How many edges moved onto a silence or a change in loudness
+        let movedEdges: Int
+        /// False when the file couldn't be opened, so nothing was moved
+        let couldReadFile: Bool
+    }
 
-        return spans.map { span in
+    @concurrent
+    static func snap(_ spans: [AdSpan], words: [TimedWord], fileURL: URL) async -> Result {
+        guard let file = try? AVAudioFile(forReading: fileURL) else {
+            return Result(spans: spans, movedEdges: 0, couldReadFile: false)
+        }
+
+        var movedEdges = 0
+        let snapped = spans.map { span in
             let start = snappedTime(near: span.start, allowed: startRange(for: span, words: words), in: file) ?? span.start
             let end = snappedTime(near: span.end, allowed: endRange(for: span, words: words), in: file) ?? span.end
+            movedEdges += (start != span.start ? 1 : 0) + (end != span.end ? 1 : 0)
             return AdSpan(start: start, end: end, kind: span.kind, sponsor: span.sponsor)
         }
+        return Result(spans: snapped, movedEdges: movedEdges, couldReadFile: true)
     }
 
     /// From the end of the word before the ad, or the search radius, up to the ad's start

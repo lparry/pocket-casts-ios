@@ -6736,17 +6736,23 @@
 /* Name for finding ads with OpenRouter. %1$@ is the model, like anthropic/claude-sonnet-5.5. OpenRouter is a product name */
 "ad_skipping_classifier_openrouter" = "OpenRouter · %1$@";
 
-/* Header above the currently playing episode on the ad skipping settings screen */
-"ad_skipping_now_playing" = "Now Playing";
+/* Header above the list of downloaded episodes on the ad skipping settings screen */
+"ad_skipping_analyses_header" = "Downloaded Episodes";
 
-/* Button that transcribes the playing episode and finds its ads again */
-"ad_skipping_analyze" = "Find Ads in This Episode";
+/* Shown on the ad skipping settings screen when nothing is downloaded */
+"ad_skipping_no_downloads" = "Download an episode to find its ads";
 
-/* Header above the list of episodes whose ads have been found */
-"ad_skipping_analyses_header" = "Episodes";
+/* Button that scans every downloaded episode that hasn't had its ads found, including ones that failed */
+"ad_skipping_scan_all" = "Scan All";
 
-/* Shown when no episodes have had their ads found yet */
-"ad_skipping_no_analyses" = "Download an episode to find its ads";
+/* Button that finds the ads in one downloaded episode */
+"ad_skipping_scan" = "Scan";
+
+/* Button that finds the ads in a downloaded episode again */
+"ad_skipping_rescan" = "Rescan";
+
+/* Status of a downloaded episode that hasn't had its ads found yet */
+"ad_skipping_status_not_scanned" = "Not scanned";
 
 /* Swipe action that deletes the ads found for an episode */
 "ad_skipping_forget" = "Forget";
@@ -6758,7 +6764,7 @@
 "ad_skipping_summary" = "Ads: %1$@ · %2$@ · %3$@";
 
 /* Status of an episode waiting to have its ads found */
-"ad_skipping_status_queued" = "Waiting…";
+"ad_skipping_status_queued" = "Queued";
 
 /* Status while an episode is being transcribed on device */
 "ad_skipping_status_transcribing" = "Transcribing…";

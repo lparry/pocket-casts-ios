@@ -5,6 +5,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>au.com.shiftyjelly.podcasts.Refresh</string>
+		<string>au.com.shiftyjelly.podcasts.AdSkipping</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>

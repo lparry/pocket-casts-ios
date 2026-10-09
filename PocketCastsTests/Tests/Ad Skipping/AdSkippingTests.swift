@@ -161,6 +161,18 @@ final class FoundationModelsAdClassifierChunkingTests: XCTestCase {
     }
 }
 
+final class AdSkippingScanOrderTests: XCTestCase {
+    func testScansUpNextFirstThenTheRestInOrder() {
+        let order = AdSkippingManager.scanOrder(downloaded: ["new", "playing", "older", "next"], upNext: ["playing", "streamed", "next"])
+
+        XCTAssertEqual(order, ["playing", "next", "new", "older"])
+    }
+
+    func testKeepsTheDownloadOrderWithoutUpNext() {
+        XCTAssertEqual(AdSkippingManager.scanOrder(downloaded: ["a", "b", "c"], upNext: []), ["a", "b", "c"])
+    }
+}
+
 final class AdSpanStoreTests: XCTestCase {
     private var directory: URL!
 
@@ -181,7 +193,6 @@ final class AdSpanStoreTests: XCTestCase {
         let store = AdSpanStore(directory: directory)
         XCTAssertEqual(store.analysis(for: "episode-1"), analysis)
         XCTAssertNil(store.analysis(for: "episode-2"))
-        XCTAssertEqual(store.allAnalyses(), [analysis])
     }
 
     func testRemovesAnalyses() throws {

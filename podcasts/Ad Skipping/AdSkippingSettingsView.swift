@@ -2,31 +2,31 @@ import PocketCastsDataModel
 import PocketCastsUtils
 import SwiftUI
 
-/// Where the listener sees how ads are found, enters an OpenRouter key, and sees what's been found
+/// Where the listener sees how ads are found, enters an OpenRouter key, and sees the scan state of every download
 struct AdSkippingSettingsView: View {
     @ObservedObject private var manager = AdSkippingManager.shared
 
     @State private var apiKeyDraft = ""
     @State private var modelDraft = ""
-    @State private var analyses: [EpisodeAdAnalysis] = []
+    @State private var episodes: [BaseEpisode] = []
 
     var body: some View {
         List {
             classifierSection
             openRouterSection
-            nowPlayingSection
-            analysesSection
+            episodesSection
         }
         .miniPlayerSafeAreaInset()
         .onAppear {
             modelDraft = manager.openRouterModel
-            reloadAnalyses()
+            reloadEpisodes()
+            manager.scanMissing()
         }
         .onDisappear {
             manager.openRouterModel = modelDraft
         }
         .onChange(of: manager.analysesVersion) { _, _ in
-            reloadAnalyses()
+            reloadEpisodes()
         }
     }
 
@@ -82,79 +82,107 @@ struct AdSkippingSettingsView: View {
         }
     }
 
-    // MARK: - Now Playing
+    // MARK: - Episodes
 
-    @ViewBuilder
-    private var nowPlayingSection: some View {
-        if let episode = PlaybackManager.shared.currentEpisode as? Episode {
-            Section {
-                Text(episode.title ?? "")
-                if let status = manager.statuses[episode.uuid] {
-                    Text(status.description)
-                        .foregroundStyle(.secondary)
-                }
-                Button(L10n.adSkippingAnalyze) {
-                    manager.enqueue(episode.uuid, force: true)
-                }
-                .disabled(!episode.downloaded(pathFinder: DownloadManager.shared))
-            } header: {
-                Text(L10n.adSkippingNowPlaying)
-            }
-        }
-    }
-
-    // MARK: - Analyses
-
-    private var analysesSection: some View {
+    private var episodesSection: some View {
         Section {
-            if analyses.isEmpty {
-                Text(L10n.adSkippingNoAnalyses)
+            if episodes.isEmpty {
+                Text(L10n.adSkippingNoDownloads)
                     .foregroundStyle(.secondary)
+            } else {
+                Button(L10n.adSkippingScanAll) {
+                    manager.scanMissing(includingFailed: true)
+                }
             }
-            ForEach(analyses, id: \.episodeUuid) { analysis in
-                DisclosureGroup {
-                    ForEach(analysis.spans, id: \.self) { span in
-                        VStack(alignment: .leading) {
-                            Text(L10n.adSkippingSpanRange(format(span.start), format(span.end)))
-                                .monospacedDigit()
-                            Text([span.kind.rawValue, span.sponsor].compactMap { $0 }.joined(separator: " · "))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } label: {
-                    VStack(alignment: .leading) {
-                        Text(title(for: analysis))
-                        Text(summary(for: analysis))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .swipeActions {
-                    Button(L10n.adSkippingForget, role: .destructive) {
-                        manager.removeAnalysis(for: analysis.episodeUuid)
-                    }
-                }
+
+            ForEach(episodes, id: \.uuid) { episode in
+                row(for: episode)
             }
         } header: {
             Text(L10n.adSkippingAnalysesHeader)
         }
     }
 
-    private func reloadAnalyses() {
-        analyses = manager.store.allAnalyses()
+    @ViewBuilder
+    private func row(for episode: BaseEpisode) -> some View {
+        let analysis = manager.currentAnalysis(for: episode)
+
+        if let analysis, !analysis.spans.isEmpty {
+            DisclosureGroup {
+                ForEach(analysis.spans, id: \.self) { span in
+                    VStack(alignment: .leading) {
+                        Text(L10n.adSkippingSpanRange(format(span.start), format(span.end)))
+                            .monospacedDigit()
+                        Text([span.kind.rawValue, span.sponsor].compactMap { $0 }.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } label: {
+                rowLabel(for: episode, analysis: analysis)
+            }
+            .swipeActions {
+                forgetButton(for: episode)
+            }
+        } else {
+            rowLabel(for: episode, analysis: analysis)
+                .swipeActions {
+                    if analysis != nil {
+                        forgetButton(for: episode)
+                    }
+                }
+        }
     }
 
-    private func title(for analysis: EpisodeAdAnalysis) -> String {
-        DataManager.shared.findEpisode(uuid: analysis.episodeUuid)?.title ?? analysis.episodeUuid
+    private func rowLabel(for episode: BaseEpisode, analysis: EpisodeAdAnalysis?) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(episode.title ?? "")
+                Text(state(for: episode, analysis: analysis))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if !isScanning(episode) {
+                Button(analysis == nil ? L10n.adSkippingScan : L10n.adSkippingRescan) {
+                    manager.enqueue(episode.uuid, force: true, first: true)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
     }
 
-    private func summary(for analysis: EpisodeAdAnalysis) -> String {
-        let adTime = analysis.spans.reduce(0) { $0 + $1.duration }
-        if let status = manager.statuses[analysis.episodeUuid], status != .finished(adCount: analysis.spans.count, classifier: analysis.classifier) {
+    private func forgetButton(for episode: BaseEpisode) -> some View {
+        Button(L10n.adSkippingForget, role: .destructive) {
+            manager.removeAnalysis(for: episode.uuid)
+        }
+    }
+
+    private func isScanning(_ episode: BaseEpisode) -> Bool {
+        switch manager.statuses[episode.uuid] {
+        case .queued, .transcribing, .classifying:
+            true
+        default:
+            false
+        }
+    }
+
+    private func reloadEpisodes() {
+        episodes = manager.downloadedEpisodes()
+    }
+
+    private func state(for episode: BaseEpisode, analysis: EpisodeAdAnalysis?) -> String {
+        switch manager.statuses[episode.uuid] {
+        case .some(.finished), .none:
+            guard let analysis else { return L10n.adSkippingStatusNotScanned }
+
+            let adTime = analysis.spans.reduce(0) { $0 + $1.duration }
+            return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime), Self.displayName(forClassifier: analysis.classifier))
+        case .some(let status):
             return status.description
         }
-        return L10n.adSkippingSummary(analysis.spans.count.localized(), format(adTime), Self.displayName(forClassifier: analysis.classifier))
     }
 
     static func displayName(forClassifier identifier: String) -> String {

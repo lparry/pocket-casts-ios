@@ -37,15 +37,6 @@ final class AdSpanStore {
         cache.withLock { $0[episodeUuid] = .some(nil) }
     }
 
-    /// Every stored analysis, newest first
-    func allAnalyses() -> [EpisodeAdAnalysis] {
-        let files = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-        return files
-            .filter { $0.pathExtension == "json" }
-            .compactMap { analysis(for: $0.deletingPathExtension().lastPathComponent) }
-            .sorted { $0.analyzedAt > $1.analyzedAt }
-    }
-
     private func load(_ episodeUuid: String) -> EpisodeAdAnalysis? {
         guard let data = try? Data(contentsOf: fileURL(for: episodeUuid)) else { return nil }
 

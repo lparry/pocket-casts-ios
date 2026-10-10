@@ -12,6 +12,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
         Constants.UserDefaults.automaticSleepTimerMode,
         Constants.UserDefaults.sleepTimerTimeWindow,
         Constants.UserDefaults.sleepTimerSetting,
+        Constants.UserDefaults.automaticSleepTimerSetting,
         Constants.UserDefaults.sleepTimerFinishedDate,
         Constants.UserDefaults.sleepTimerFinishedEpisodeUuid,
         Constants.UserDefaults.autoplay
@@ -31,6 +32,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
             let minute = components.hour! * 60 + components.minute!
             preferences.mode = .timeWindow
             preferences.timeWindow = .init(startMinute: minute, endMinute: (minute + 60) % 1440)
+            preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
             PlaybackManager.shared.endPlayback()
             PlaybackManager.shared.queue.clearUpNextList()
             try prepareAudio(for: episode)
@@ -94,7 +96,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
     @MainActor
     func testDownloadReloadPreservesCancellationUntilDeliberatePlay() async {
         let playback = PlaybackManager.shared
-        preferences.lastSetting = .init(duration: 1800, sleepOnEpisodeEnd: nil)
+        preferences.automaticTimer = .init(duration: 1800, sleepOnEpisodeEnd: nil)
         await startPlayback { playback.load(episode: episode, autoPlay: true, overrideUpNext: true) }
         XCTAssertTrue(playback.sleepTimerActive())
         playback.cancelSleepTimer(userInitiated: true)

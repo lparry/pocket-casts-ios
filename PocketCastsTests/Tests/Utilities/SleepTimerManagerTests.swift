@@ -25,7 +25,7 @@ final class SleepTimerManagerTests: XCTestCase {
                                     now: { [unowned self] in self.currentDate },
                                     calendar: { [unowned self] in self.calendar })
         preferences.mode = .timeWindow
-        preferences.lastSetting = .init(duration: 30.minutes, sleepOnEpisodeEnd: nil)
+        preferences.lastSetting = .init(duration: 5.minutes, sleepOnEpisodeEnd: nil)
     }
 
     override func tearDown() {
@@ -34,15 +34,29 @@ final class SleepTimerManagerTests: XCTestCase {
         super.tearDown()
     }
 
-    func testWindowStartsSavedDurationWithoutPreviousTimerExpiry() {
+    func testWindowStartsDefaultAutomaticTimerWithoutPreviousTimerExpiry() {
         manager.restartSleepTimerIfNeeded()
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
+    }
+
+    func testWindowStartsChosenAutomaticTimerInsteadOfLastUsedTimer() {
+        preferences.automaticTimer = .init(duration: 45.minutes, sleepOnEpisodeEnd: nil)
+        manager.recordSleepTimerDuration(duration: 5.minutes, onEpisodeEnd: nil)
+        manager.restartSleepTimerIfNeeded()
+        XCTAssertEqual(playback.startedDurations, [45.minutes])
+    }
+
+    func testWindowStartsChosenEndOfEpisodeTimer() {
+        preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
+        manager.restartSleepTimerIfNeeded()
+        XCTAssertEqual(playback.startedEpisodeCounts, [1])
+        XCTAssertTrue(playback.startedDurations.isEmpty)
     }
 
     func testWindowRestartsRegardlessOfHowLongAgoTimerFinished() {
         preferences.finishedDate = currentDate.addingTimeInterval(-3.hours)
         manager.restartSleepTimerIfNeeded()
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testWindowDoesNotActivateOutsideChosenHours() {
@@ -65,7 +79,7 @@ final class SleepTimerManagerTests: XCTestCase {
         manager.restartSleepTimerIfNeeded()
         manager.restartSleepTimerIfNeeded()
         manager.restartSleepTimerIfNeeded(userInitiated: false)
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testExpiredTimerCanStartAgainLaterInsideWindow() {
@@ -74,7 +88,7 @@ final class SleepTimerManagerTests: XCTestCase {
         manager.recordSleepTimerFinished()
         currentDate = currentDate.addingTimeInterval(1.hour)
         manager.restartSleepTimerIfNeeded()
-        XCTAssertEqual(playback.startedDurations, [30.minutes, 30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes, 10.minutes])
     }
 
     func testManualCancellationSurvivesAutomaticEpisodeChangesUntilDeliberatePlay() {
@@ -83,20 +97,20 @@ final class SleepTimerManagerTests: XCTestCase {
         manager.restartSleepTimerIfNeeded(userInitiated: false)
         XCTAssertTrue(playback.startedDurations.isEmpty)
         manager.restartSleepTimerIfNeeded(userInitiated: true)
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testInternalCancellationDoesNotSuppressAutomaticActivation() {
         manager.cancelSleepTimer(userInitiated: false)
         manager.restartSleepTimerIfNeeded(userInitiated: false)
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testChoosingAnotherTimerClearsManualCancellation() {
         manager.cancelSleepTimer(userInitiated: true)
         manager.recordSleepTimerDuration(duration: 15.minutes, onEpisodeEnd: nil)
         manager.restartSleepTimerIfNeeded(userInitiated: false)
-        XCTAssertEqual(playback.startedDurations, [15.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testOffNeverActivatesTimer() {
@@ -117,7 +131,7 @@ final class SleepTimerManagerTests: XCTestCase {
         currentDate = date(hour: 12)
         preferences.finishedDate = currentDate.addingTimeInterval(-5.minutes)
         manager.restartSleepTimerIfNeeded()
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [5.minutes])
     }
 
     func testLegacyModeDoesNotRestartAfterFiveMinutes() {
@@ -142,8 +156,10 @@ final class SleepTimerManagerTests: XCTestCase {
         XCTAssertTrue(playback.startedDurations.isEmpty)
     }
 
-    func testEpisodeTimerStartsImmediatelyWithOriginalChosenCount() {
+    func testLegacyModeRestartsEpisodeTimerWithOriginalChosenCount() {
+        preferences.mode = .afterTimerEnds
         manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 3)
+        manager.recordSleepTimerFinished()
         defaults.set(1, forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes)
         manager.restartSleepTimerIfNeeded()
         XCTAssertEqual(playback.startedEpisodeCounts, [3])
@@ -156,6 +172,7 @@ final class SleepTimerManagerTests: XCTestCase {
                 playback.active = false
                 playback.startedEpisodeCounts = []
                 preferences.mode = mode
+                preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: count)
                 manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: count)
                 manager.recordSleepTimerFinished(episodeUuid: "finished")
 
@@ -170,6 +187,7 @@ final class SleepTimerManagerTests: XCTestCase {
     }
 
     func testFinishedEpisodeRemainsDeferredAfterRelaunch() {
+        preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
         manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 1)
         manager.recordSleepTimerFinished(episodeUuid: "finished")
         let reloaded = SleepTimerManager(preferences: .init(userDefaults: defaults),
@@ -184,6 +202,7 @@ final class SleepTimerManagerTests: XCTestCase {
     }
 
     func testRewindingFinishedEpisodeAllowsTimerOnNextPlay() {
+        preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
         manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 1)
         manager.recordSleepTimerFinished(episodeUuid: "finished")
         manager.recordRewind(episodeUuid: "unrelated")
@@ -196,6 +215,7 @@ final class SleepTimerManagerTests: XCTestCase {
     }
 
     func testExplicitlyChoosingNewTimerClearsFinishedEpisodeDeferral() {
+        preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 2)
         manager.recordSleepTimerFinished(episodeUuid: "finished")
         manager.recordSleepTimerDuration(duration: nil, onEpisodeEnd: true, numberOfEpisodes: 2)
         manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
@@ -207,13 +227,15 @@ final class SleepTimerManagerTests: XCTestCase {
         manager.recordSleepTimerDuration(duration: 30.minutes, onEpisodeEnd: nil)
         manager.recordSleepTimerFinished()
         manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testLegacyEpisodeTimerRestoresCountWithoutDurationNotification() {
         let legacyData = Data(#"{"sleepOnEpisodeEnd":true}"#.utf8)
         defaults.set(legacyData, forKey: Constants.UserDefaults.sleepTimerSetting)
         defaults.set(2, forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes)
+        preferences.mode = .afterTimerEnds
+        preferences.finishedDate = currentDate
         manager.restartSleepTimerIfNeeded()
         XCTAssertEqual(playback.startedEpisodeCounts, [2])
     }
@@ -225,12 +247,23 @@ final class SleepTimerManagerTests: XCTestCase {
         XCTAssertEqual(SleepTimerManager.Preferences(userDefaults: defaults).lastSetting?.numberOfEpisodes, 4)
     }
 
+    func testAutomaticTimerDefaultsToTenMinutesAndSurvivesReloadingPreferences() {
+        XCTAssertEqual(preferences.automaticTimer.duration, 10.minutes)
+        preferences.automaticTimer = .init(duration: 25.minutes, sleepOnEpisodeEnd: nil)
+        XCTAssertEqual(SleepTimerManager.Preferences(userDefaults: defaults).automaticTimer.duration, 25.minutes)
+        preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
+        XCTAssertEqual(SleepTimerManager.Preferences(userDefaults: defaults).automaticTimer.numberOfEpisodes, 1)
+        XCTAssertEqual(preferences.lastSetting?.duration, 5.minutes)
+    }
+
     func testMissingOrInvalidTimerDoesNotActivate() {
+        preferences.automaticTimer = .init(duration: -10, sleepOnEpisodeEnd: nil)
+        manager.restartSleepTimerIfNeeded()
+        preferences.automaticTimer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 0)
+        manager.restartSleepTimerIfNeeded()
+        preferences.mode = .afterTimerEnds
+        preferences.finishedDate = currentDate
         preferences.lastSetting = nil
-        manager.restartSleepTimerIfNeeded()
-        preferences.lastSetting = .init(duration: -10, sleepOnEpisodeEnd: nil)
-        manager.restartSleepTimerIfNeeded()
-        preferences.lastSetting = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 0)
         manager.restartSleepTimerIfNeeded()
         XCTAssertTrue(playback.startedDurations.isEmpty)
         XCTAssertTrue(playback.startedEpisodeCounts.isEmpty)
@@ -297,7 +330,7 @@ final class SleepTimerManagerTests: XCTestCase {
         XCTAssertTrue(preferences.timeWindow.contains(instant, calendar: calendar))
         currentDate = instant
         manager.restartSleepTimerIfNeeded()
-        XCTAssertEqual(playback.startedDurations, [30.minutes])
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testDaylightSavingChangesUseWallClockTime() {

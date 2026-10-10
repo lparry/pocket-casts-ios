@@ -3,23 +3,36 @@ import UIKit
 
 final class SleepTimerSettingsViewController: PCTableViewController {
     private enum Section { case modes, window, timer }
+    private enum TimerRow { case duration, endOfEpisode, stopAfter }
+
+    private static let timeStepperCellId = "TimeStepperCell"
 
     private let preferences: SleepTimerManager.Preferences
     private var mode: SleepTimerManager.AutomaticMode
     private var window: SleepTimerManager.TimeWindow
-    private var initialTimerSetting: SleepTimerManager.SleepTimerSetting?
+    private var timer: SleepTimerManager.SleepTimerSetting
 
     private var sections: [Section] {
-        var sections: [Section] = [.modes]
-        if mode == .timeWindow { sections.append(.window) }
-        if mode != .off { sections.append(.timer) }
-        return sections
+        mode == .timeWindow ? [.modes, .window, .timer] : [.modes]
+    }
+
+    private var timerStopsAtEpisodeEnd: Bool {
+        timer.duration == nil
+    }
+
+    private var timerRows: [TimerRow] {
+        timerStopsAtEpisodeEnd ? [.duration, .endOfEpisode] : [.duration, .endOfEpisode, .stopAfter]
+    }
+
+    private var timerDuration: TimeInterval {
+        timer.duration ?? SleepTimerManager.SleepTimerSetting.defaultAutomaticDuration
     }
 
     init(preferences: SleepTimerManager.Preferences = .init()) {
         self.preferences = preferences
         mode = preferences.mode
         window = preferences.timeWindow
+        timer = preferences.automaticTimer
         super.init(style: .insetGrouped)
     }
 
@@ -32,6 +45,7 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         title = L10n.sleepTimerAutomaticTitle
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 70
+        tableView.register(UINib(nibName: Self.timeStepperCellId, bundle: nil), forCellReuseIdentifier: Self.timeStepperCellId)
         insetAdjuster.setupInsetAdjustmentsForMiniPlayer(scrollView: tableView)
         customRightBtn = UIBarButtonItem(barButtonSystemItem: .save, target: self, action: #selector(save))
         updateSaveButton()
@@ -48,7 +62,7 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         switch sections[section] {
         case .modes: return SleepTimerManager.AutomaticMode.allCases.count
         case .window: return 2
-        case .timer: return 1
+        case .timer: return timerRows.count
         }
     }
 
@@ -80,23 +94,14 @@ final class SleepTimerSettingsViewController: PCTableViewController {
             }
             return cell
         case .timer:
-            if let setting = preferences.lastSetting ?? initialTimerSetting {
-                let description: String
-                if let duration = setting.duration {
-                    description = TimeFormatter.shared.minutesHoursFormatted(time: duration)
-                } else {
-                    let count = setting.numberOfEpisodes ?? preferences.legacyEpisodeCount
-                    description = count == 1 ? L10n.sleepTimerEndOfEpisode : L10n.sleepTimerEpisodeCount(count)
-                }
-                let needsInitialTimer = preferences.lastSetting == nil
-                let cell = textCell(title: needsInitialTimer ? L10n.sleepTimerAutomaticChooseTimer : L10n.sleepTimerAutomaticLastUsed, subtitle: description)
-                cell.accessoryType = needsInitialTimer ? .disclosureIndicator : .none
-                cell.selectionStyle = needsInitialTimer ? .default : .none
-                return cell
+            switch timerRows[indexPath.row] {
+            case .duration:
+                return timerChoiceCell(title: L10n.sleepTimerAutomaticDuration, selected: !timerStopsAtEpisodeEnd)
+            case .endOfEpisode:
+                return timerChoiceCell(title: L10n.sleepTimerEndOfEpisode, selected: timerStopsAtEpisodeEnd)
+            case .stopAfter:
+                return stopAfterCell(tableView, indexPath: indexPath)
             }
-            let cell = textCell(title: L10n.sleepTimerAutomaticChooseTimer)
-            cell.accessoryType = .disclosureIndicator
-            return cell
         }
     }
 
@@ -107,14 +112,26 @@ final class SleepTimerSettingsViewController: PCTableViewController {
             mode = SleepTimerManager.AutomaticMode.allCases[indexPath.row]
             reloadData()
         case .timer:
-            if preferences.lastSetting == nil { chooseInitialTimer() }
+            switch timerRows[indexPath.row] {
+            case .duration:
+                timer = .init(duration: timerDuration, sleepOnEpisodeEnd: nil)
+            case .endOfEpisode:
+                timer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
+            case .stopAfter:
+                return
+            }
+            reloadData()
         case .window:
             break
         }
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        sections[section] == .window ? L10n.sleepTimerAutomaticEveryDay : nil
+        switch sections[section] {
+        case .modes: return nil
+        case .window: return L10n.sleepTimerAutomaticEveryDay
+        case .timer: return L10n.sleepTimer
+        }
     }
 
     private var windowFooter: String {
@@ -122,12 +139,7 @@ final class SleepTimerSettingsViewController: PCTableViewController {
     }
 
     func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        switch sections[section] {
-        case .modes: return nil
-        case .window: return windowFooter
-        case .timer:
-            return (initialTimerSetting ?? preferences.lastSetting) == nil ? L10n.sleepTimerAutomaticChooseTimerDescription : L10n.sleepTimerAutomaticLastUsedDescription
-        }
+        sections[section] == .window ? windowFooter : nil
     }
 
     private func textCell(title: String, subtitle: String? = nil) -> ThemeableCell {
@@ -147,14 +159,40 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         return cell
     }
 
+    private func timerChoiceCell(title: String, selected: Bool) -> ThemeableCell {
+        let cell = textCell(title: title)
+        cell.accessoryType = selected ? .checkmark : .none
+        cell.accessibilityTraits = selected ? [.button, .selected] : .button
+        return cell
+    }
+
+    private func stopAfterCell(_ tableView: UITableView, indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: Self.timeStepperCellId, for: indexPath) as! TimeStepperCell
+        let title = L10n.sleepTimerAutomaticStopAfter
+        let duration = timerDuration
+        cell.cellLabel.text = title
+        cell.cellSecondaryLabel.text = TimeFormatter.shared.minutesHoursFormatted(time: duration)
+        cell.timeStepper.tintColor = ThemeColor.primaryInteractive01()
+        cell.timeStepper.minimumValue = Constants.Limits.minSleepTime
+        cell.timeStepper.maximumValue = Constants.Limits.maxSleepTime
+        cell.timeStepper.currentValue = duration
+        cell.configureAccessibilityLabel(text: title, time: Int(duration))
+        cell.onValueChanged = { [weak self, weak cell] value in
+            self?.timer = .init(duration: value, sleepOnEpisodeEnd: nil)
+            cell?.cellSecondaryLabel.text = TimeFormatter.shared.minutesHoursFormatted(time: value)
+            cell?.configureAccessibilityLabel(text: title, time: Int(value))
+        }
+        return cell
+    }
+
     private func updateSaveButton() {
-        customRightBtn?.isEnabled = mode != .timeWindow || (window.isValid && (initialTimerSetting ?? preferences.lastSetting) != nil)
+        customRightBtn?.isEnabled = mode != .timeWindow || window.isValid
     }
 
     @objc private func save() {
-        guard mode != .timeWindow || (window.isValid && (initialTimerSetting ?? preferences.lastSetting) != nil) else { return }
-        if preferences.lastSetting == nil, let initialTimerSetting { preferences.lastSetting = initialTimerSetting }
+        guard mode != .timeWindow || window.isValid else { return }
         if window.isValid { preferences.timeWindow = window }
+        preferences.automaticTimer = timer
         let previousMode = preferences.mode
         preferences.mode = mode
         if previousMode != mode {
@@ -164,25 +202,6 @@ final class SleepTimerSettingsViewController: PCTableViewController {
             }
         }
         navigationController?.popViewController(animated: true)
-    }
-
-    private func chooseInitialTimer() {
-        let picker = OptionsPicker(title: L10n.sleepTimerAutomaticChooseTimer)
-        var durations: [TimeInterval] = [5.minutes, 15.minutes, 30.minutes, 1.hour]
-        let customDuration = Settings.customSleepTime
-        if !durations.contains(customDuration) { durations.append(customDuration) }
-        for duration in durations {
-            picker.addAction(action: OptionAction(label: TimeFormatter.shared.minutesHoursFormatted(time: duration)) { [weak self] in
-                self?.initialTimerSetting = .init(duration: duration, sleepOnEpisodeEnd: nil)
-                self?.reloadData()
-            })
-        }
-        let count = preferences.legacyEpisodeCount
-        picker.addAction(action: OptionAction(label: count == 1 ? L10n.sleepTimerEndOfEpisode : L10n.sleepTimerEpisodeCount(count)) { [weak self] in
-            self?.initialTimerSetting = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: count)
-            self?.reloadData()
-        })
-        picker.present(from: self)
     }
 
     override func handleThemeChanged() { tableView.reloadData() }

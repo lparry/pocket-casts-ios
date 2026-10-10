@@ -87,19 +87,21 @@ class SleepTimerManager {
             cancelledForCurrentSession = false
         }
 
-        guard !playback().sleepTimerActive(), !cancelledForCurrentSession,
-              let setting = preferences.lastSetting else { return }
+        guard !playback().sleepTimerActive(), !cancelledForCurrentSession else { return }
 
         let currentDate = now()
+        let setting: SleepTimerSetting
         switch preferences.mode {
         case .off:
             return
         case .afterTimerEnds:
-            guard let finishedDate = preferences.finishedDate else { return }
+            guard let lastSetting = preferences.lastSetting, let finishedDate = preferences.finishedDate else { return }
             let elapsed = currentDate.timeIntervalSince(finishedDate)
             guard elapsed >= 0, elapsed <= restartSleepTimerIfPlayingAgainWithin else { return }
+            setting = lastSetting
         case .timeWindow:
             guard preferences.timeWindow.contains(currentDate, calendar: calendar()) else { return }
+            setting = preferences.automaticTimer
         }
 
         // Leave the finished episode available to rewind. Re-arming its episode timer here
@@ -161,6 +163,9 @@ class SleepTimerManager {
         let duration: TimeInterval?
         let sleepOnEpisodeEnd: Bool?
         var numberOfEpisodes: Int? = nil
+
+        static let defaultAutomaticDuration: TimeInterval = 10.minutes
+        static let defaultAutomaticTimer = SleepTimerSetting(duration: defaultAutomaticDuration, sleepOnEpisodeEnd: nil)
     }
 
     enum AutomaticMode: Int, CaseIterable {
@@ -228,6 +233,16 @@ class SleepTimerManager {
             }
             nonmutating set {
                 userDefaults.setJSONObject(newValue, forKey: Constants.UserDefaults.sleepTimerSetting)
+            }
+        }
+
+        /// The timer started by the time of day mode, chosen in the automatic sleep timer settings.
+        var automaticTimer: SleepTimerSetting {
+            get {
+                (try? userDefaults.jsonObject(SleepTimerSetting.self, forKey: Constants.UserDefaults.automaticSleepTimerSetting)) ?? .defaultAutomaticTimer
+            }
+            nonmutating set {
+                userDefaults.setJSONObject(newValue, forKey: Constants.UserDefaults.automaticSleepTimerSetting)
             }
         }
 

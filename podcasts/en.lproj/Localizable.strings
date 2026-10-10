@@ -4802,7 +4802,7 @@
 /* Automatic sleep timer mode that activates at selected times of day */
 "sleep_timer_automatic_time_window" = "Time of Day";
 /* Explanation of automatic sleep timer activation inside the chosen time window */
-"sleep_timer_automatic_time_window_description" = "Start your last sleep timer whenever you play during these hours.";
+"sleep_timer_automatic_time_window_description" = "Start a sleep timer whenever you play during these hours.";
 /* Header above the start and end times of a daily sleep timer window */
 "sleep_timer_automatic_every_day" = "Every Day";
 /* Label for the start time of the automatic sleep timer window */
@@ -4813,14 +4813,10 @@
 "sleep_timer_automatic_window_description" = "Times follow your device’s local time and can span midnight. An active timer keeps running after the end time.";
 /* Validation message when both ends of the automatic sleep timer window are the same */
 "sleep_timer_automatic_invalid_window" = "Choose different start and end times.";
-/* Label above the most recently chosen sleep timer setting */
-"sleep_timer_automatic_last_used" = "Last Used";
-/* Explanation that automatic activation reuses the last timer selected in the player */
-"sleep_timer_automatic_last_used_description" = "Uses the last timer you chose in the player, including its duration or number of episodes.";
-/* Button to choose an initial timer when no previous sleep timer exists */
-"sleep_timer_automatic_choose_timer" = "Choose a Sleep Timer";
-/* Explanation shown when automatic sleep timer activation has no previous timer to reuse */
-"sleep_timer_automatic_choose_timer_description" = "Choose a timer to use first. After that, your most recent sleep timer setting will be used automatically.";
+/* Option to stop playback after a set length of time when the sleep timer starts automatically */
+"sleep_timer_automatic_duration" = "Duration";
+/* Label for the length of the automatically started sleep timer, followed by a stepper to change it */
+"sleep_timer_automatic_stop_after" = "Stop After";
 
 /* Description of the option to shake to restart sleep timer */
 "shake_to_restart_sleep_timer_description" = "If on, the sleep timer will restart when you shake your phone.";

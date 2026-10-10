@@ -21,6 +21,10 @@ struct FoundationModelsAdClassifier: AdClassifier {
         "on-device"
     }
 
+    var runsOnDevice: Bool {
+        true
+    }
+
     static var isAvailable: Bool {
         SystemLanguageModel.default.isAvailable
     }

@@ -72,12 +72,38 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     private let classifiersProvider: (_ openRouterApiKey: String?, _ openRouterModel: String) -> [AdClassifier]
     private let dataManager: DataManager
 
+    /// The two halves of a scan, which run side by side, so one episode can be transcribed while another's ads are found
+    enum Stage: CaseIterable {
+        /// On device, costing battery
+        case transcription
+        /// Finding the ads in a transcript, costing money, and placing their edges
+        case detection
+    }
+
+    /// What should happen next to an episode that isn't scanned yet
+    enum ScanStep: Equatable {
+        case transcribe
+        case findAds
+        case wait(Status)
+    }
+
+    /// The episodes waiting for each stage, in the order they'll be done
     @MainActor
-    private var pending: [String] = []
+    private var queues: [Stage: [String]] = [.transcription: [], .detection: []]
+    /// The episode each stage is working on
     @MainActor
-    private var processingUuid: String?
+    private var current: [Stage: String] = [:]
     @MainActor
-    private var processingTask: Task<Void, Never>?
+    private var tasks: [Stage: Task<Void, Never>] = [:]
+    /// Episodes re-downloaded or rescanned while they were being worked on, which are scanned again when that's done
+    @MainActor
+    private var rescanWhenDone: Set<String> = []
+    /// How long each transcript made this session took, kept for the analysis made from it
+    @MainActor
+    private var transcriptionTimes: [String: TimeInterval] = [:]
+    /// Transcribing and the on-device model are both heavy, so they take turns
+    @MainActor
+    private let onDeviceWork = OnDeviceWorkGate()
     /// Keeps a scan going for a while after the app is backgrounded
     @MainActor
     private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
@@ -92,9 +118,6 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     /// Episodes the listener asked to scan, which ignore the Up Next and battery limits
     @MainActor
     private var requested: Set<String> = []
-    /// What the episode being processed is being scanned for
-    @MainActor
-    private var processingPlan: ScanPlan?
     /// Waits for Up Next or the power state to settle before looking for what to scan
     @MainActor
     private var rescanTask: Task<Void, Never>?
@@ -279,6 +302,32 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return canTranscribe ? .transcribeOnly : .waitingForPower
     }
 
+    /// Which stage a scan goes to next. A download that's already transcribed goes straight to finding its ads.
+    static func nextStep(plan: ScanPlan, hasTranscript: Bool) -> ScanStep {
+        switch plan {
+        case .full:
+            hasTranscript ? .findAds : .transcribe
+        case .transcribeOnly:
+            hasTranscript ? .wait(.waitingForUpNext) : .transcribe
+        case .waitingForUpNext:
+            .wait(.waitingForUpNext)
+        case .waitingForPower:
+            .wait(.waitingForPower)
+        }
+    }
+
+    @MainActor
+    private func nextStep(for episode: BaseEpisode, window: Set<String>?, conditions: ScanConditions) -> ScanStep {
+        let hasTranscript = transcriptStore.hasTranscript(for: episode.uuid, audioFileSize: Self.fileSize(of: episode))
+        let plan = Self.scanPlan(requested: requested.contains(episode.uuid), inDetectionWindow: window?.contains(episode.uuid) ?? true, hasTranscript: hasTranscript, conditions: conditions)
+        return Self.nextStep(plan: plan, hasTranscript: hasTranscript)
+    }
+
+    @MainActor
+    private func nextStep(for uuid: String) -> ScanStep? {
+        dataManager.findBaseEpisode(uuid: uuid).map { nextStep(for: $0, window: currentDetectionWindow(), conditions: Self.currentConditions()) }
+    }
+
     @MainActor
     static func currentConditions() -> ScanConditions {
         let batteryState = UIDevice.current.batteryState
@@ -309,14 +358,6 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return ([nowPlaying].compactMap { $0 } + upNext).filter { seen.insert($0).inserted }
     }
 
-    @MainActor
-    private func scanPlan(for episode: BaseEpisode, window: Set<String>?, conditions: ScanConditions) -> ScanPlan {
-        Self.scanPlan(requested: requested.contains(episode.uuid),
-                      inDetectionWindow: window?.contains(episode.uuid) ?? true,
-                      hasTranscript: transcriptStore.hasTranscript(for: episode.uuid, audioFileSize: Self.fileSize(of: episode)),
-                      conditions: conditions)
-    }
-
     /// Up Next, charging, Low Power Mode and the thermal state can all change often, and from any thread
     @objc private func scanConditionsChanged() {
         Task { @MainActor in
@@ -334,13 +375,10 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     /// Stops transcribing ahead of time when the phone comes off the charger, so the battery isn't used for it
     @MainActor
     private func stopTranscribingIfNoLongerAllowed() {
-        guard processingPlan == .transcribeOnly, let uuid = processingUuid, let episode = dataManager.findBaseEpisode(uuid: uuid) else { return }
+        guard let uuid = current[.transcription], case .wait = nextStep(for: uuid) else { return }
 
-        let plan = scanPlan(for: episode, window: currentDetectionWindow(), conditions: Self.currentConditions())
-        if plan != .transcribeOnly, plan != .full {
-            FileLog.shared.addMessage("AdSkipping: stopped transcribing \(uuid) ahead of time, since the phone isn't charging")
-            processingTask?.cancel()
-        }
+        FileLog.shared.addMessage("AdSkipping: stopped transcribing \(uuid), since the phone isn't charging")
+        tasks[.transcription]?.cancel()
     }
 
     // MARK: - Kinds
@@ -403,10 +441,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         if scan {
             scanMissing()
         } else {
-            let episodeUuids = Set(pending.filter { uuid in
+            let episodeUuids = Set(queues.values.joined().filter { uuid in
                 dataManager.findEpisode(uuid: uuid)?.podcastUuid == podcastUuid
             })
-            pending.removeAll { episodeUuids.contains($0) }
+            for stage in Stage.allCases {
+                queues[stage]?.removeAll { episodeUuids.contains($0) }
+            }
             for uuid in episodeUuids {
                 statuses[uuid] = nil
             }
@@ -541,22 +581,56 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     /// A scan the listener asked for is `requested`, and ignores the Up Next and battery limits.
     @MainActor
     func enqueue(_ episodeUuid: String, force: Bool = false, first: Bool = false, requested isRequested: Bool = false) {
-        guard FeatureFlag.autoAdSkip.enabled, processingUuid != episodeUuid else { return }
+        guard FeatureFlag.autoAdSkip.enabled else { return }
         guard let episode = dataManager.findBaseEpisode(uuid: episodeUuid), isScanning(episode) else { return }
+
+        // Being worked on already, maybe for a file that's just been replaced, so go again once that's done
+        if current.values.contains(episodeUuid) {
+            if force {
+                rescanWhenDone.insert(episodeUuid)
+                if isRequested {
+                    requested.insert(episodeUuid)
+                }
+            }
+            return
+        }
+
         guard force || (currentAnalysis(for: episode) == nil && !hasKnownFailure(episode, classifiers: Self.classifiersKey(classifiers))) else { return }
 
-        pending.removeAll { $0 == episodeUuid }
         retryableFailures.remove(episodeUuid)
         if isRequested {
             requested.insert(episodeUuid)
         }
-        if first {
-            pending.insert(episodeUuid, at: 0)
-        } else {
-            pending.append(episodeUuid)
-        }
-        statuses[episodeUuid] = .queued
+        // Whether it waits is decided when its turn comes, since Up Next and the battery may change before then
+        let hasTranscript = transcriptStore.hasTranscript(for: episodeUuid, audioFileSize: Self.fileSize(of: episode))
+        route(episodeUuid, to: hasTranscript ? .findAds : .transcribe, first: first)
         processNextIfNeeded()
+    }
+
+    /// Moves an episode into the queue for its next stage, out of any other, or marks it as waiting
+    @MainActor
+    private func route(_ uuid: String, to step: ScanStep, first: Bool) {
+        for stage in Stage.allCases {
+            queues[stage]?.removeAll { $0 == uuid }
+        }
+
+        let stage: Stage
+        switch step {
+        case .transcribe:
+            stage = .transcription
+        case .findAds:
+            stage = .detection
+        case .wait(let status):
+            statuses[uuid] = status
+            return
+        }
+
+        if first {
+            queues[stage]?.insert(uuid, at: 0)
+        } else {
+            queues[stage]?.append(uuid)
+        }
+        statuses[uuid] = .queued
     }
 
     /// Queues every downloaded episode that hasn't been scanned for the file on disk, playing and Up Next first, as far as
@@ -590,27 +664,32 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         // Collected and published once, since there can be hundreds of downloads
         var newStatuses = statuses
-        var toScan: [String] = []
+        var toScan: [Stage: [String]] = [.transcription: [], .detection: []]
+        let working = Set(current.values)
         for uuid in ordered {
-            guard uuid != processingUuid, !skipped.contains(uuid), let episode = episodesByUuid[uuid] else { continue }
+            guard !working.contains(uuid), !skipped.contains(uuid), let episode = episodesByUuid[uuid] else { continue }
             if case .failed = statuses[uuid], !retryableFailures.contains(uuid) {
                 continue
             }
 
-            switch scanPlan(for: episode, window: window, conditions: conditions) {
-            case .full, .transcribeOnly:
-                toScan.append(uuid)
+            switch nextStep(for: episode, window: window, conditions: conditions) {
+            case .transcribe:
+                toScan[.transcription]?.append(uuid)
                 newStatuses[uuid] = .queued
-            case .waitingForUpNext:
-                newStatuses[uuid] = .waitingForUpNext
-            case .waitingForPower:
-                newStatuses[uuid] = .waitingForPower
+            case .findAds:
+                toScan[.detection]?.append(uuid)
+                newStatuses[uuid] = .queued
+            case .wait(let status):
+                newStatuses[uuid] = status
             }
         }
 
-        let toScanSet = Set(toScan)
+        // Everything just routed goes first, in scan order, ahead of anything queued some other way
+        let routed = Set(toScan.values.joined())
         let waiting = Set(newStatuses.filter { $0.value == .waitingForUpNext || $0.value == .waitingForPower }.keys)
-        pending = toScan + pending.filter { !toScanSet.contains($0) && !waiting.contains($0) }
+        for stage in Stage.allCases {
+            queues[stage] = (toScan[stage] ?? []) + (queues[stage] ?? []).filter { !routed.contains($0) && !waiting.contains($0) }
+        }
         if newStatuses != statuses {
             statuses = newStatuses
         }
@@ -724,103 +803,165 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     // MARK: - Processing
 
     @MainActor
-    private func processNextIfNeeded() {
-        guard processingUuid == nil, !isPaused else { return }
+    private var isIdle: Bool {
+        current.isEmpty && queues.values.allSatisfy(\.isEmpty)
+    }
 
-        guard !pending.isEmpty else {
-            resumeIdleWaiters()
-            return
+    /// Starts each stage on its next episode, if it's free
+    @MainActor
+    private func processNextIfNeeded() {
+        for stage in Stage.allCases {
+            startNext(stage)
         }
 
-        let uuid = pending.removeFirst()
-        processingUuid = uuid
+        updateBackgroundTask()
+        if isIdle {
+            resumeIdleWaiters()
+        }
+    }
 
-        processingTask = Task {
-            await process(uuid)
-            processingUuid = nil
-            processingTask = nil
+    @MainActor
+    private func startNext(_ stage: Stage) {
+        guard current[stage] == nil, !isPaused, let uuid = queues[stage]?.first else { return }
+
+        queues[stage]?.removeFirst()
+        current[stage] = uuid
+        tasks[stage] = Task {
+            switch stage {
+            case .transcription:
+                await transcribe(uuid)
+            case .detection:
+                await findAds(uuid)
+            }
+
+            current[stage] = nil
+            tasks[stage] = nil
+            if rescanWhenDone.remove(uuid) != nil {
+                enqueue(uuid, force: true, first: true)
+            }
             processNextIfNeeded()
         }
     }
 
+    /// Transcribes an episode, then hands it to the detection stage if its ads are due to be found
     @MainActor
-    private func process(_ uuid: String) async {
+    private func transcribe(_ uuid: String) async {
         // Decided now rather than when queued, since Up Next and the battery may have changed since
-        let plan = dataManager.findBaseEpisode(uuid: uuid).map { scanPlan(for: $0, window: currentDetectionWindow(), conditions: Self.currentConditions()) } ?? .full
-        switch plan {
-        case .waitingForUpNext:
-            statuses[uuid] = .waitingForUpNext
+        switch nextStep(for: uuid) {
+        case .wait(let status):
+            statuses[uuid] = status
             return
-        case .waitingForPower:
-            statuses[uuid] = .waitingForPower
+        case .findAds:
+            route(uuid, to: .findAds, first: requested.contains(uuid))
             return
-        case .full, .transcribeOnly:
+        case .transcribe, nil:
             break
         }
 
-        processingPlan = plan
-        beginBackgroundTask()
-        defer {
-            processingPlan = nil
-            endBackgroundTask()
-        }
-
         retryableFailures.remove(uuid)
-
-        // Captured before the scan, so a failure is tied to the file and classifiers it happened with
-        let classifiersKey = Self.classifiersKey(classifiers)
-        let fileSize = dataManager.findBaseEpisode(uuid: uuid).flatMap { Self.fileSize(of: $0) }
+        let failureKey = failureKey(for: uuid)
 
         do {
-            if let result = try await analyze(uuid, findingAds: plan == .full) {
-                failureStore.remove(uuid)
-                statuses[uuid] = .finished(adCount: result.spans.count, classifier: result.classifier)
-                FileLog.shared.addMessage("AdSkipping: \(result.classifier) found \(result.spans.count) ads in \(uuid)")
-            } else {
-                FileLog.shared.addMessage("AdSkipping: transcribed \(uuid) ahead of time")
-                // It may have moved up Up Next while it was being transcribed
-                if let episode = dataManager.findBaseEpisode(uuid: uuid), scanPlan(for: episode, window: currentDetectionWindow(), conditions: Self.currentConditions()) == .full {
-                    pending.insert(uuid, at: 0)
-                    statuses[uuid] = .queued
-                } else {
-                    statuses[uuid] = .waitingForUpNext
-                }
+            try await makeTranscript(uuid)
+            FileLog.shared.addMessage("AdSkipping: transcribed \(uuid)")
+
+            // It may have moved up Up Next while it was being transcribed
+            switch nextStep(for: uuid) {
+            case .findAds:
+                route(uuid, to: .findAds, first: requested.contains(uuid))
+            default:
+                statuses[uuid] = .waitingForUpNext
             }
-            requested.remove(uuid)
         } catch where Task.isCancelled {
             // Interrupted, not failed, so pick it up again next time
-            pending.insert(uuid, at: 0)
+            queues[.transcription]?.insert(uuid, at: 0)
             statuses[uuid] = .queued
-            FileLog.shared.addMessage("AdSkipping: interrupted while scanning \(uuid)")
+            FileLog.shared.addMessage("AdSkipping: interrupted while transcribing \(uuid)")
         } catch {
-            requested.remove(uuid)
-            statuses[uuid] = .failed(error.localizedDescription)
-            if AdSkippingError.isRetryable(error) {
-                retryableFailures.insert(uuid)
-            } else if AdSkippingError.isPermanent(error) {
-                let failure = AdScanFailure(audioFileSize: fileSize, classifiers: classifiersKey, message: error.localizedDescription, failedAt: Date())
-                try? failureStore.save(failure, for: uuid)
-            }
-            FileLog.shared.addMessage("AdSkipping: failed to scan \(uuid): \(error)")
+            scanFailed(uuid, error: error, key: failureKey)
         }
     }
 
-    /// Transcribing a long episode takes a while, so ask for time to finish if the app is backgrounded.
-    /// If that time runs out, the scan stops and is picked up again later, so iOS doesn't end the app.
+    /// Finds the ads in an episode's transcript, and places their edges
     @MainActor
-    private func beginBackgroundTask() {
-        endBackgroundTask()
-        backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "AdSkipping") { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else { return }
+    private func findAds(_ uuid: String) async {
+        switch nextStep(for: uuid) {
+        case .wait(let status):
+            statuses[uuid] = status
+            return
+        case .transcribe:
+            route(uuid, to: .transcribe, first: true)
+            return
+        case .findAds, nil:
+            break
+        }
 
-                FileLog.shared.addMessage("AdSkipping: ran out of background time, pausing until the app is next active")
-                self.isPaused = true
-                self.processingTask?.cancel()
-                self.scheduleBackgroundScanningIfNeeded()
-                self.endBackgroundTask()
+        retryableFailures.remove(uuid)
+        let failureKey = failureKey(for: uuid)
+
+        do {
+            guard let result = try await detectAds(uuid) else {
+                // The transcript has gone, maybe with a re-download, so it needs making again
+                route(uuid, to: .transcribe, first: true)
+                return
+            }
+
+            failureStore.remove(uuid)
+            requested.remove(uuid)
+            statuses[uuid] = .finished(adCount: result.spans.count, classifier: result.classifier)
+            FileLog.shared.addMessage("AdSkipping: \(result.classifier) found \(result.spans.count) ads in \(uuid)")
+        } catch where Task.isCancelled {
+            queues[.detection]?.insert(uuid, at: 0)
+            statuses[uuid] = .queued
+            FileLog.shared.addMessage("AdSkipping: interrupted while finding ads in \(uuid)")
+        } catch {
+            scanFailed(uuid, error: error, key: failureKey)
+        }
+    }
+
+    /// Captured before a stage starts, so a failure is tied to the file and classifiers it happened with
+    @MainActor
+    private func failureKey(for uuid: String) -> (classifiers: String, fileSize: UInt64?) {
+        (Self.classifiersKey(classifiers), dataManager.findBaseEpisode(uuid: uuid).flatMap { Self.fileSize(of: $0) })
+    }
+
+    @MainActor
+    private func scanFailed(_ uuid: String, error: Error, key: (classifiers: String, fileSize: UInt64?)) {
+        requested.remove(uuid)
+        statuses[uuid] = .failed(error.localizedDescription)
+        if AdSkippingError.isRetryable(error) {
+            retryableFailures.insert(uuid)
+        } else if AdSkippingError.isPermanent(error) {
+            let failure = AdScanFailure(audioFileSize: key.fileSize, classifiers: key.classifiers, message: error.localizedDescription, failedAt: Date())
+            try? failureStore.save(failure, for: uuid)
+        }
+        FileLog.shared.addMessage("AdSkipping: failed to scan \(uuid): \(error)")
+    }
+
+    /// Transcribing a long episode takes a while, so ask for time to finish if the app is backgrounded while either stage
+    /// is working. If that time runs out, both stop and are picked up again later, so iOS doesn't end the app.
+    @MainActor
+    private func updateBackgroundTask() {
+        if current.isEmpty {
+            endBackgroundTask()
+        } else if backgroundTaskId == .invalid {
+            backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "AdSkipping") { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+
+                    FileLog.shared.addMessage("AdSkipping: ran out of background time, pausing until the app is next active")
+                    self.isPaused = true
+                    self.cancelWork()
+                    self.scheduleBackgroundScanningIfNeeded()
+                    self.endBackgroundTask()
+                }
             }
         }
+    }
+
+    @MainActor
+    private func cancelWork() {
+        tasks.values.forEach { $0.cancel() }
     }
 
     @MainActor
@@ -831,14 +972,61 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         backgroundTaskId = .invalid
     }
 
-    /// Transcribes the episode if it hasn't been, then finds its ads unless it's only `findingAds` later, returning nil
+    /// Transcribes the download and saves the transcript for the detection stage
     @MainActor
-    private func analyze(_ uuid: String, findingAds: Bool) async throws -> (spans: [AdSpan], classifier: String)? {
+    private func makeTranscript(_ uuid: String) async throws {
+        guard let episode = dataManager.findBaseEpisode(uuid: uuid), episode.downloaded(pathFinder: DownloadManager.shared) else {
+            throw AdSkippingError.notDownloaded
+        }
+        // Nothing is scanned without a key, so there's no point transcribing either
+        guard !classifiers.isEmpty else {
+            throw AdSkippingError.noClassifier
+        }
+        guard let transcriber = transcriberProvider() else {
+            throw AdSkippingError.transcriptionUnavailable
+        }
+
+        let fileURL = URL(fileURLWithPath: episode.pathToDownloadedFile(pathFinder: DownloadManager.shared))
+        let fileSize = Self.fileSize(of: episode)
+        let clock = ContinuousClock()
+
+        statuses[uuid] = .transcribing(progress: nil, timeLeft: nil)
+        await onDeviceWork.acquire()
+        defer {
+            onDeviceWork.release()
+        }
+
+        let audioDuration = Self.audioDuration(of: fileURL)
+        let started = clock.now
+        // Podcasts don't record their language, so assume they're in the listener's
+        let transcript = try await transcriber.transcribe(fileURL: fileURL, locale: Locale.current) { [weak self] progress in
+            Task { @MainActor in
+                self?.transcriptionProgressed(uuid, progress: progress, since: started, clock: clock)
+            }
+        }
+        try Task.checkCancellation()
+
+        transcriptionTimes[uuid] = (clock.now - started).seconds
+        // Saved even when empty, so it isn't transcribed again only to come out empty
+        try? transcriptStore.save(transcript, for: uuid, audioFileSize: fileSize, audioDuration: audioDuration)
+
+        guard !transcript.isEmpty else {
+            throw AdSkippingError.emptyTranscript
+        }
+    }
+
+    /// Finds the ads in the saved transcript, or returns nil if there isn't one for the file on disk
+    @MainActor
+    private func detectAds(_ uuid: String) async throws -> (spans: [AdSpan], classifier: String)? {
         guard let episode = dataManager.findBaseEpisode(uuid: uuid), episode.downloaded(pathFinder: DownloadManager.shared) else {
             throw AdSkippingError.notDownloaded
         }
 
-        let classifiers = classifiers
+        // The on-device model waits for the transcription stage, rather than running alongside it
+        let onDeviceWork = onDeviceWork
+        let classifiers = classifiers.map { classifier -> AdClassifier in
+            classifier.runsOnDevice ? TakingTurnsClassifier(base: classifier, gate: onDeviceWork) : classifier
+        }
         guard !classifiers.isEmpty else {
             throw AdSkippingError.noClassifier
         }
@@ -848,38 +1036,17 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let clock = ContinuousClock()
         var timings = AdScanTimings()
 
-        let transcript: [TranscriptSegment]
-        if let saved = transcriptStore.transcript(for: uuid, audioFileSize: fileSize) {
-            transcript = saved.segments
-            timings.audioDuration = saved.audioDuration
-        } else {
-            guard let transcriber = transcriberProvider() else {
-                throw AdSkippingError.transcriptionUnavailable
-            }
-
-            statuses[uuid] = .transcribing(progress: nil, timeLeft: nil)
-            let audioDuration = Self.audioDuration(of: fileURL)
-            let started = clock.now
-            // Podcasts don't record their language, so assume they're in the listener's
-            transcript = try await transcriber.transcribe(fileURL: fileURL, locale: Locale.current) { [weak self] progress in
-                Task { @MainActor in
-                    self?.transcriptionProgressed(uuid, progress: progress, since: started, clock: clock)
-                }
-            }
-            try Task.checkCancellation()
-
-            timings.audioDuration = audioDuration
-            timings.transcription = (clock.now - started).seconds
-            try? transcriptStore.save(transcript, for: uuid, audioFileSize: fileSize, audioDuration: audioDuration)
-        }
+        statuses[uuid] = .classifying
+        guard let saved = await Self.loadTranscript(episodeUuid: uuid, audioFileSize: fileSize, from: transcriptStore) else { return nil }
+        let transcript = saved.segments
+        timings.audioDuration = saved.audioDuration
+        // Only known when it was transcribed this session
+        timings.transcription = transcriptionTimes.removeValue(forKey: uuid)
 
         guard !transcript.isEmpty else {
             throw AdSkippingError.emptyTranscript
         }
 
-        guard findingAds else { return nil }
-
-        statuses[uuid] = .classifying
         let podcastTitle = (episode as? Episode)?.parentPodcast(dataManager: dataManager)?.title
         // The episode's duration isn't always known yet, but the transcript runs nearly to the end
         let duration = episode.duration > 0 ? episode.duration : transcript.last?.end ?? 0
@@ -931,6 +1098,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         analysesVersion += 1
 
         return (spans, classifier.identifier)
+    }
+
+    /// A long transcript takes a moment to read, so it's read off the main thread
+    @concurrent
+    private static func loadTranscript(episodeUuid: String, audioFileSize: UInt64?, from transcriptStore: TranscriptStore) async -> (segments: [TranscriptSegment], audioDuration: TimeInterval?)? {
+        transcriptStore.transcript(for: episodeUuid, audioFileSize: audioFileSize)
     }
 
     /// Uses the first classifier that gives an answer, moving on only when one's answer can't be used.
@@ -990,7 +1163,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     @MainActor
     private func scheduleBackgroundScanningIfNeeded() {
         // Downloads waiting for power are transcribed by the task, which only runs while charging
-        guard processingUuid != nil || !pending.isEmpty || statuses.values.contains(.waitingForPower) else { return }
+        guard !isIdle || statuses.values.contains(.waitingForPower) else { return }
 
         // Transcription is heavy, so only carry on in the background while charging
         let request = BGProcessingTaskRequest(identifier: Self.backgroundTaskIdentifier)
@@ -1022,7 +1195,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
                 FileLog.shared.addMessage("AdSkipping: background scanning ran out of time")
                 work.cancel()
                 self?.isPaused = true
-                self?.processingTask?.cancel()
+                self?.cancelWork()
                 self?.resumeIdleWaiters()
                 task.setTaskCompleted(success: false)
                 self?.scheduleBackgroundScanningIfNeeded()
@@ -1038,11 +1211,66 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func waitUntilIdle() async {
-        guard processingUuid != nil || !pending.isEmpty else { return }
+        guard !isIdle else { return }
 
         await withCheckedContinuation { continuation in
             idleContinuations.append(continuation)
         }
+    }
+}
+
+/// Lets one heavy on-device job run at a time, first come first served. Transcribing and the on-device model each use a
+/// lot of memory and heat, so they take turns rather than running together.
+@MainActor
+final class OnDeviceWorkGate {
+    private var isBusy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        guard isBusy else {
+            isBusy = true
+            return
+        }
+        // Released straight to the next in line, so it stays busy
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            isBusy = false
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
+/// An on-device classifier that waits its turn with transcription
+private struct TakingTurnsClassifier: AdClassifier {
+    let base: AdClassifier
+    let gate: OnDeviceWorkGate
+
+    var identifier: String {
+        base.identifier
+    }
+
+    var runsOnDevice: Bool {
+        true
+    }
+
+    func adSpans(in transcript: [TranscriptSegment], context: AdClassificationContext) async throws -> [AdSpan] {
+        await gate.acquire()
+        defer {
+            Task { @MainActor in gate.release() }
+        }
+        return try await base.adSpans(in: transcript, context: context)
+    }
+
+    func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?] {
+        await gate.acquire()
+        defer {
+            Task { @MainActor in gate.release() }
+        }
+        return try await base.boundaryWordIndices(for: requests)
     }
 }
 

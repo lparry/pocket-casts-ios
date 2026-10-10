@@ -19,6 +19,15 @@ protocol AdClassifier {
     /// For each request, which word in its `words` is the ad's first (for `.start`) or last (for `.end`), or nil if it
     /// isn't in them. An episode's edges all come at once, so a remote classifier can answer them in one call.
     func boundaryWordIndices(for requests: [AdBoundaryRequest]) async throws -> [Int?]
+
+    /// Whether it runs on this device, so it takes turns with transcribing
+    var runsOnDevice: Bool { get }
+}
+
+extension AdClassifier {
+    var runsOnDevice: Bool {
+        false
+    }
 }
 
 enum AdBoundaryEdge {

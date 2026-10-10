@@ -796,6 +796,65 @@ final class AdScanTimingsTests: XCTestCase {
     }
 }
 
+final class AdScanStageTests: XCTestCase {
+    func testSendsADownloadWithATranscriptStraightToFindingAds() {
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: .full, hasTranscript: true), .findAds)
+    }
+
+    func testTranscribesFirstWhenThereIsNoTranscript() {
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: .full, hasTranscript: false), .transcribe)
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: .transcribeOnly, hasTranscript: false), .transcribe)
+    }
+
+    func testATranscriptMadeAheadOfTimeWaitsForUpNext() {
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: .transcribeOnly, hasTranscript: true), .wait(.waitingForUpNext))
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: .waitingForUpNext, hasTranscript: true), .wait(.waitingForUpNext))
+    }
+
+    func testWaitsForPowerToTranscribe() {
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: .waitingForPower, hasTranscript: false), .wait(.waitingForPower))
+    }
+
+    func testHandsOverOnceTranscribedIfItsAdsAreDue() {
+        let conditions = AdSkippingManager.ScanConditions(isCharging: true, isLowPowerMode: false, isHot: false)
+
+        // In the window: transcribed, then straight on to finding ads
+        let inWindow = AdSkippingManager.scanPlan(requested: false, inDetectionWindow: true, hasTranscript: true, conditions: conditions)
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: inWindow, hasTranscript: true), .findAds)
+
+        // Further down Up Next: transcribed ahead of time, and waits
+        let outside = AdSkippingManager.scanPlan(requested: false, inDetectionWindow: false, hasTranscript: true, conditions: conditions)
+        XCTAssertEqual(AdSkippingManager.nextStep(plan: outside, hasTranscript: true), .wait(.waitingForUpNext))
+    }
+
+    @MainActor
+    func testOnDeviceWorkTakesTurns() async {
+        let gate = OnDeviceWorkGate()
+        var events: [String] = []
+
+        await gate.acquire()
+        events.append("transcribing")
+
+        let onDevice = Task { @MainActor in
+            await gate.acquire()
+            events.append("on-device model")
+            gate.release()
+        }
+        // Give the on-device model the chance to start, which it can't while transcribing
+        await Task.yield()
+        await Task.yield()
+        events.append("transcribed")
+        gate.release()
+
+        await onDevice.value
+        XCTAssertEqual(events, ["transcribing", "transcribed", "on-device model"])
+
+        // And it's free again afterwards
+        await gate.acquire()
+        gate.release()
+    }
+}
+
 final class AdScanLimitTests: XCTestCase {
     private let charging = AdSkippingManager.ScanConditions(isCharging: true, isLowPowerMode: false, isHot: false)
     private let onBattery = AdSkippingManager.ScanConditions(isCharging: false, isLowPowerMode: false, isHot: false)

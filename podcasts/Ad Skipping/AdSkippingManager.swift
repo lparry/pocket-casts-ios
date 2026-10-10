@@ -291,10 +291,22 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     private func currentDetectionWindow() -> Set<String>? {
         guard let limit = upNextLimit else { return nil }
 
+        let (nowPlaying, upNext) = currentUpNext()
+        return Self.detectionWindow(nowPlaying: nowPlaying, upNext: upNext, limit: limit)
+    }
+
+    /// The playing episode and Up Next after it, in queue order. Scanning, the detection window and the Ad Zapping list
+    /// all go by this, so they can't disagree.
+    @MainActor
+    private func currentUpNext() -> (nowPlaying: String?, upNext: [String]) {
         let playbackManager = PlaybackManager.shared
-        return Self.detectionWindow(nowPlaying: playbackManager.currentEpisode?.uuid,
-                                    upNext: playbackManager.queue.allEpisodes(includeNowPlaying: false).map(\.uuid),
-                                    limit: limit)
+        return (playbackManager.currentEpisode?.uuid, playbackManager.queue.allEpisodes(includeNowPlaying: false).map(\.uuid))
+    }
+
+    /// The playing episode first, then the rest of Up Next in its order
+    static func upNextOrder(nowPlaying: String?, upNext: [String]) -> [String] {
+        var seen = Set<String>()
+        return ([nowPlaying].compactMap { $0 } + upNext).filter { seen.insert($0).inserted }
     }
 
     @MainActor
@@ -540,8 +552,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let episodes = downloaded.filter { isScanning($0) }
         let episodesByUuid = Dictionary(episodes.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
         let skipped = Set(episodes.filter { currentAnalysis(for: $0) != nil || hasKnownFailure($0, classifiers: classifiersKey) }.map(\.uuid))
-        let upNext = PlaybackManager.shared.queue.allEpisodes(includeNowPlaying: true).map(\.uuid)
-        let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: upNext)
+        let (nowPlaying, upNext) = currentUpNext()
+        let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: Self.upNextOrder(nowPlaying: nowPlaying, upNext: upNext))
         let window = currentDetectionWindow()
         let conditions = Self.currentConditions()
 
@@ -586,6 +598,17 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     @MainActor
     func downloadedEpisodes() -> [BaseEpisode] {
         dataManager.findDownloadedEpisodes().filter { $0.downloaded(pathFinder: DownloadManager.shared) }
+    }
+
+    /// Every downloaded episode in the order they're scanned: the one playing, then Up Next, then the rest, most recently
+    /// downloaded first
+    @MainActor
+    func downloadedEpisodesInScanOrder() -> [BaseEpisode] {
+        let episodes = downloadedEpisodes()
+        let episodesByUuid = Dictionary(episodes.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
+        let (nowPlaying, upNext) = currentUpNext()
+        return Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: Self.upNextOrder(nowPlaying: nowPlaying, upNext: upNext))
+            .compactMap { episodesByUuid[$0] }
     }
 
     /// Why this download couldn't be scanned, if it failed for good

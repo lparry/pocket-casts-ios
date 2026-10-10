@@ -29,6 +29,13 @@ struct AdScanningView: View {
         .onChange(of: manager.analysesVersion) { _, _ in
             reloadEpisodes()
         }
+        // Kept in the same order as Up Next, which also changes when a different episode starts playing
+        .onReceive(NotificationCenter.default.publisher(for: Constants.Notifications.upNextQueueChanged)) { _ in
+            reloadEpisodes()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Constants.Notifications.episodeDownloaded)) { _ in
+            reloadEpisodes()
+        }
     }
 
     private var episodesSection: some View {
@@ -91,6 +98,6 @@ struct AdScanningView: View {
     }
 
     private func reloadEpisodes() {
-        episodes = manager.downloadedEpisodes()
+        episodes = manager.downloadedEpisodesInScanOrder()
     }
 }

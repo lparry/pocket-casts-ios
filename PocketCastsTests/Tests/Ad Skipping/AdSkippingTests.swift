@@ -260,6 +260,21 @@ final class AdSkippingScanOrderTests: XCTestCase {
     func testKeepsTheDownloadOrderWithoutUpNext() {
         XCTAssertEqual(AdSkippingManager.scanOrder(downloaded: ["a", "b", "c"], upNext: []), ["a", "b", "c"])
     }
+
+    func testPutsThePlayingEpisodeBeforeUpNext() {
+        XCTAssertEqual(AdSkippingManager.upNextOrder(nowPlaying: "playing", upNext: ["a", "b"]), ["playing", "a", "b"])
+        XCTAssertEqual(AdSkippingManager.upNextOrder(nowPlaying: nil, upNext: ["a", "b"]), ["a", "b"])
+        XCTAssertEqual(AdSkippingManager.upNextOrder(nowPlaying: "a", upNext: ["a", "b"]), ["a", "b"], "Not listed twice")
+    }
+
+    func testListsAJustDownloadedEpisodeAfterThePlayingOneAndUpNext() {
+        // Downloads come most recent first, so a new download would otherwise go above the playing episode
+        let upNext = AdSkippingManager.upNextOrder(nowPlaying: "playing", upNext: ["next", "later"])
+
+        let order = AdSkippingManager.scanOrder(downloaded: ["just-downloaded", "later", "older", "playing", "next"], upNext: upNext)
+
+        XCTAssertEqual(order, ["playing", "next", "later", "just-downloaded", "older"])
+    }
 }
 
 final class AdSkippingPlaybackTests: XCTestCase {

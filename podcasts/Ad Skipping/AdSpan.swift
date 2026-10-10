@@ -169,14 +169,36 @@ struct AdScanTimings: Codable, Equatable {
 }
 
 extension EpisodeAdAnalysis {
-    /// Whether this many ads couldn't be right: more than 40% of the episode, or more than 24 an hour.
-    /// A real news episode on the listener's phone had 8 ads, 23% of its length, at about 19 an hour.
+    /// Whether this many ads couldn't be right: more than 40% of the episode, or more than 24 ad breaks an hour.
+    /// Breaks are counted rather than ads, since several back-to-back ads in one break are common, joined the same way
+    /// playback skips them. A real news episode on the listener's phone had 8 ads, 23% of its length, at about 19 an hour.
     static func looksWrong(_ spans: [AdSpan], duration: TimeInterval) -> Bool {
         guard duration > 0 else { return false }
 
         let adTime = spans.reduce(0) { $0 + $1.duration }
-        let perHour = Double(spans.count) / (duration / 3600)
-        return adTime / duration > 0.4 || (spans.count > 6 && perHour > 24)
+        let breaks = breakCount(spans)
+        let perHour = Double(breaks) / (duration / 3600)
+        return adTime / duration > 0.4 || (breaks > 6 && perHour > 24)
+    }
+
+    static func breakCount(_ spans: [AdSpan]) -> Int {
+        let sorted = spans.sorted { $0.start < $1.start }
+        return zip(sorted, sorted.dropFirst()).reduce(sorted.isEmpty ? 0 : 1) { count, pair in
+            AdSkippingManager.isSameBreak(pair.0, pair.1) ? count : count + 1
+        }
+    }
+
+    /// Analyses from before ad breaks were counted could be marked suspect for having lots of ads in a few breaks,
+    /// so a suspect one is judged again rather than rescanned. `duration` is the episode's, when it's known.
+    func rejudged(duration: TimeInterval) -> EpisodeAdAnalysis {
+        guard isSuspect else { return self }
+
+        let duration = duration > 0 ? duration : timings?.audioDuration ?? 0
+        guard duration > 0, !Self.looksWrong(spans, duration: duration) else { return self }
+
+        var analysis = self
+        analysis.isSuspect = false
+        return analysis
     }
 }
 

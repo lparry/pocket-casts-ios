@@ -493,6 +493,34 @@ final class AdPlausibilityTests: XCTestCase {
         XCTAssertFalse(EpisodeAdAnalysis.looksWrong(ads(3, each: 15), duration: 600))
     }
 
+    /// Three breaks of three or four back-to-back ads in 20 minutes: 10 ads, 30 an hour, but only 3 breaks
+    private let backToBackBreaks: [AdSpan] = [(0.0, 3), (500, 4), (1000, 3)].flatMap { start, count in
+        (0..<count).map { index -> AdSpan in
+            let adStart = start + Double(index) * 33
+            return AdSpan(start: adStart, end: adStart + 30, kind: .inserted, sponsor: nil)
+        }
+    }
+
+    func testCountsBackToBackAdsAsOneBreak() {
+        XCTAssertEqual(EpisodeAdAnalysis.breakCount(backToBackBreaks), 3)
+        XCTAssertFalse(EpisodeAdAnalysis.looksWrong(backToBackBreaks, duration: 1200))
+    }
+
+    func testRejudgesStoredSuspectAnalyses() throws {
+        var analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion, episodeUuid: "e", analyzedAt: Date(), classifier: "openrouter", audioFileSize: 1, transcriptSegmentCount: 1, spans: backToBackBreaks)
+        analysis.isSuspect = true
+        analysis.timings = AdScanTimings(audioDuration: 1200)
+
+        XCTAssertFalse(analysis.rejudged(duration: 1200).isSuspect)
+        // Falls back to the transcribed audio's length when the episode's isn't known
+        XCTAssertFalse(analysis.rejudged(duration: 0).isSuspect)
+        // Still too many breaks an hour in a much shorter episode
+        let spread = (0..<8).map { AdSpan(start: Double($0) * 100, end: Double($0) * 100 + 20, kind: .inserted, sponsor: nil) }
+        var tooMany = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion, episodeUuid: "e", analyzedAt: Date(), classifier: "openrouter", audioFileSize: 1, transcriptSegmentCount: 1, spans: spread)
+        tooMany.isSuspect = true
+        XCTAssertTrue(tooMany.rejudged(duration: 900).isSuspect)
+    }
+
     func testRemembersSuspectAnalyses() throws {
         var analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion, episodeUuid: "e", analyzedAt: Date(), classifier: "on-device", audioFileSize: 1, transcriptSegmentCount: 1, spans: [])
         XCTAssertFalse(analysis.isSuspect)

@@ -458,6 +458,10 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
     /// Ads in the same break are joined into one skip when they're at most this far apart, so the jingles and pauses between them don't play
     static let breakGap: TimeInterval = 8
 
+    static func isSameBreak(_ previous: AdSpan, _ next: AdSpan) -> Bool {
+        next.start - previous.end <= breakGap
+    }
+
     /// What to skip at `time`, if it's in an ad
     func adSkip(in episode: BaseEpisode, at time: TimeInterval) -> AdSkip? {
         guard let (spans, kinds, restored) = skippableSpans(in: episode, at: time) else { return nil }
@@ -498,7 +502,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
         var joined = [skippable[index]]
         for span in skippable[(index + 1)...] {
-            guard let last = joined.last, span.start - last.end <= breakGap else { break }
+            guard let last = joined.last, isSameBreak(last, span) else { break }
             joined.append(span)
         }
 
@@ -545,7 +549,13 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
 
     /// The stored analysis, if it was made from the download that's on disk now. Spans never line up with a stream.
     func currentAnalysis(for episode: BaseEpisode) -> EpisodeAdAnalysis? {
-        guard let analysis = store.analysis(for: episode.uuid), episode.downloaded(pathFinder: DownloadManager.shared) else { return nil }
+        guard var analysis = store.analysis(for: episode.uuid), episode.downloaded(pathFinder: DownloadManager.shared) else { return nil }
+
+        let rejudged = analysis.rejudged(duration: episode.duration)
+        if rejudged.isSuspect != analysis.isSuspect {
+            analysis = rejudged
+            try? store.save(analysis)
+        }
 
         if let matches = playbackState.withLock({ $0.analysisMatchesFile[episode.uuid] }) {
             return matches ? analysis : nil

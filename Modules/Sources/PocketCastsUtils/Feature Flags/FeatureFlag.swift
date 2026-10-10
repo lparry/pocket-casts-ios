@@ -256,6 +256,9 @@ public enum FeatureFlag: String, CaseIterable {
     /// Ignore non-200 responses (such as 304 Not Modified) to the background Up Next sync instead of treating them as an empty queue
     case ignoreUnsuccessfulBackgroundUpNextSync
 
+    /// Transcribe downloaded episodes on device, ask Claude to find the ads, and skip them during playback
+    case autoAdSkip
+
     public var enabled: Bool {
         if let overriddenValue = FeatureFlagOverrideStore().overriddenValue(for: self) {
             return overriddenValue
@@ -436,6 +439,8 @@ public enum FeatureFlag: String, CaseIterable {
             true
         case .ignoreUnsuccessfulBackgroundUpNextSync:
             true
+        case .autoAdSkip:
+            false
         }
     }
 

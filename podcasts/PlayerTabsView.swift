@@ -9,6 +9,7 @@ protocol PlayerTabDelegate: AnyObject {
 enum PlayerTabs: Int {
     case nowPlaying
     case showNotes
+    case adZapping
     case chapters
     case bookmarks
 
@@ -18,6 +19,8 @@ enum PlayerTabs: Int {
             return L10n.nowPlaying
         case .showNotes:
             return L10n.playerShowNotesTitle
+        case .adZapping:
+            return L10n.adSkippingTitle
         case .chapters:
             return L10n.chapters
         case .bookmarks:
@@ -49,6 +52,8 @@ class PlayerTabsView: UIScrollView {
                 break
             case .showNotes:
                 AnalyticsHelper.playerShowNotesOpened()
+            case .adZapping:
+                break
             case .chapters:
                 AnalyticsHelper.chaptersOpened()
                 trackChaptersShown()
@@ -258,6 +263,8 @@ private extension PlayerTabsView {
             tabName = "now_playing"
         case .showNotes:
             tabName = "show_notes"
+        case .adZapping:
+            tabName = "ad_zapping"
         case .chapters:
             tabName = "chapters"
         case .bookmarks:

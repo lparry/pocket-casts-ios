@@ -13,6 +13,7 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
         case upNextHistory, foldersHistory
         case headphoneControls
         case developer, beta
+        case adSkipping
 
         /// Whether the section should be displayed or not
         var visible: Bool {
@@ -22,6 +23,9 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
 
             case .pocketCastsPlus:
                 return !SubscriptionHelper.hasActiveSubscription()
+
+            case .adSkipping:
+                return FeatureFlag.autoAdSkip.enabled
 
             default:
                 return true
@@ -70,6 +74,8 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
                 return (L10n.upNextHistory, .init(named: "upnext"))
             case .foldersHistory:
                 return (L10n.foldersHistory, .init(named: "folder-empty"))
+            case .adSkipping:
+                return (L10n.adSkippingTitle, UIImage(systemName: "forward.end"))
             }
         }
     }
@@ -90,6 +96,7 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
             [.general, .notifications, .appearance],
             [.autoArchive, .autoDownload, .autoAddToUpNext],
             [.storageAndDataUse, .siriShortcuts, .headphoneControls, .watch, .customFiles],
+            [.adSkipping],
             [.importSteps, .opml],
             [.upNextHistory, .foldersHistory],
             [.privacy, .about]
@@ -213,6 +220,13 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
         case .foldersHistory:
             let foldersHistoryViewController = FolderHistoryViewController()
             navigationController?.pushViewController(foldersHistoryViewController, animated: true)
+        case .adSkipping:
+            let settingsView = AdSkippingSettingsView { [weak self] in
+                self?.navigationController?.pushViewController(AdScanningView.makeViewController(), animated: true)
+            }
+            let hostingController = UIHostingController(rootView: settingsView.setupDefaultEnvironment())
+            hostingController.title = L10n.adSkippingTitle
+            navigationController?.pushViewController(hostingController, animated: true)
         }
     }
 

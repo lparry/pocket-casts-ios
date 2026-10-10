@@ -59,6 +59,14 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         return item
     }()
 
+    lazy var adZappingItem: AdZappingPlayerTabController = {
+        let item = AdZappingPlayerTabController()
+        item.containerDelegate = self
+        item.view.translatesAutoresizingMaskIntoConstraints = false
+
+        return item
+    }()
+
     lazy var chaptersItem: ChaptersViewController = {
         let item = ChaptersViewController()
         item.scrollViewHandler = self
@@ -121,6 +129,7 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
 
     var showingChapters = false
     var showingNotes = false
+    var showingAdZapping = false
     var showingBookmarks = false
 
     var finalScrollViewConstraint: NSLayoutConstraint?
@@ -253,6 +262,8 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         addCustomObserver(Constants.Notifications.playbackStarted, selector: #selector(update))
         addCustomObserver(Constants.Notifications.playbackTrackChanged, selector: #selector(update))
         addCustomObserver(Constants.Notifications.podcastChaptersDidUpdate, selector: #selector(update))
+        // The Ad Zapping tab appears once the playing episode is downloaded
+        addCustomObserver(Constants.Notifications.episodeDownloaded, selector: #selector(update))
         addCustomObserver(Constants.Notifications.themeChanged, selector: #selector(themeDidChange))
     }
 

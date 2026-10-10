@@ -6694,6 +6694,12 @@
 /* Message shown when a network the user tapped fails to load */
 "network_fail_to_load" = "This network couldn't be loaded";
 
+/* Toast shown when skipping back into or over an ad that Ad Zapping skipped, so it plays instead of being skipped again */
+"ad_skipping_unzapped" = "Ad un-zapped";
+
+/* Toast shown when skipping back over several ads that Ad Zapping skipped, so they play instead of being skipped again. %1$@ is the number of ads */
+"ad_skipping_unzapped_plural" = "%1$@ ads un-zapped";
+
 /* Toast shown when Ad Zapping automatically skips past an ad in the episode */
 "ad_skipping_skipped" = "Zapped an ad";
 

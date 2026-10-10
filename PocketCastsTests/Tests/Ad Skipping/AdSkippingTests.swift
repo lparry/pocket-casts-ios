@@ -325,6 +325,44 @@ final class AdSkippingPlaybackTests: XCTestCase {
         XCTAssertEqual(AdSkippingManager.adSkip(in: adBreak, at: 20, skipping: [.inserted], restored: [])?.end, 40)
     }
 
+    func testUnzapsAnAdASkipBackLandsIn() {
+        let ad = AdSpan(start: 100, end: 130, kind: .inserted, sponsor: nil)
+
+        // Zapped to 130, then skipped back 15 seconds a moment later
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [ad], from: 133, to: 118, skipping: allKinds, restored: []), [ad])
+    }
+
+    func testUnzapsAdsASkipBackJumpsOver() {
+        let first = AdSpan(start: 100, end: 130, kind: .inserted, sponsor: nil)
+        let second = AdSpan(start: 132, end: 160, kind: .hostRead, sponsor: nil)
+
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [first, second], from: 170, to: 90, skipping: allKinds, restored: []), [first, second])
+    }
+
+    func testLeavesAdsTheSkipBackDoesntReach() {
+        let earlier = AdSpan(start: 100, end: 130, kind: .inserted, sponsor: nil)
+        let later = AdSpan(start: 300, end: 330, kind: .inserted, sponsor: nil)
+
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [earlier, later], from: 160, to: 145, skipping: allKinds, restored: []), [], "Lands after the ad")
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [later], from: 160, to: 145, skipping: allKinds, restored: []), [], "The ad is still ahead")
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [earlier], from: 140, to: 150, skipping: allKinds, restored: []), [], "Not backwards")
+    }
+
+    func testOnlyUnzapsAdsThatWouldBeZapped() {
+        let selfPromo = AdSpan(start: 100, end: 130, kind: .selfPromo, sponsor: nil)
+        let restored = AdSpan(start: 132, end: 160, kind: .inserted, sponsor: nil)
+
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [selfPromo, restored], from: 165, to: 90, skipping: [.inserted], restored: [restored]), [])
+    }
+
+    func testALongRewindOnlyUnzapsAdsThatJustEnded() {
+        let early = AdSpan(start: 100, end: 130, kind: .inserted, sponsor: nil)
+        let recent = AdSpan(start: 1000, end: 1030, kind: .inserted, sponsor: nil)
+
+        // Rewinding to the start from just after the second ad
+        XCTAssertEqual(AdSkippingManager.adsToUnzap(in: [early, recent], from: 1040, to: 0, skipping: allKinds, restored: []), [recent])
+    }
+
     func testPlaysAPreviewedAdThroughOnceOnly() {
         let ad = AdSpan(start: 100, end: 130, kind: .inserted, sponsor: nil)
 

@@ -399,7 +399,25 @@ class PlaybackManager: ServerPlaybackDelegate {
 
         let currPos = currentTime()
         let backTime = max(currPos - amount, 0)
+        unzapAdsSkippedBack(from: currPos, to: backTime)
         seekTo(time: backTime, seekHint: .back)
+    }
+
+    /// Skipping back into or over an ad that was just zapped means the listener wants to hear it, which is the only way to
+    /// say so from a car or headphones
+    private func unzapAdsSkippedBack(from: TimeInterval, to: TimeInterval) {
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+        guard FeatureFlag.autoAdSkip.enabled, let episode = currentEpisode else { return }
+
+        let unzapped = AdSkippingManager.shared.unzapAds(in: episode, skippingBackFrom: from, to: to)
+        guard !unzapped.isEmpty else { return }
+
+        FileLog.shared.addMessage("Un-zapped \(unzapped.count) ads skipping back from \(from) to \(to) in \(episode.uuid)")
+        let title = unzapped.count == 1 ? L10n.adSkippingUnzapped : L10n.adSkippingUnzappedPlural(unzapped.count.localized())
+        Task { @MainActor in
+            Toast.show(title)
+        }
+#endif
     }
 
     func skipForward() {

@@ -467,6 +467,37 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return skip.end - time > 1 ? skip : nil
     }
 
+    /// How long after an ad ends a skip back over it still counts as wanting to hear it
+    static let unzapWindow: TimeInterval = 120
+
+    /// Lets the ads a skip back lands in or jumps back over play, like Undo on the toast, since the listener is often
+    /// using a car or headphones and never sees the toast. Returns the ads it un-zapped.
+    @discardableResult
+    func unzapAds(in episode: BaseEpisode, skippingBackFrom from: TimeInterval, to: TimeInterval) -> [AdSpan] {
+        guard let (spans, kinds, restored) = skippableSpans(in: episode, at: to) else { return [] }
+
+        let unzapped = Self.adsToUnzap(in: spans, from: from, to: to, skipping: kinds, restored: restored)
+        if !unzapped.isEmpty {
+            restore(unzapped, in: episode.uuid)
+        }
+        return unzapped
+    }
+
+    /// The ads that would be zapped which a skip back from `from` to `to` lands in or jumps back over. Only ads that ended
+    /// within `window` of `from` count, so rewinding a long way doesn't un-zap every ad along the way.
+    static func adsToUnzap(in spans: [AdSpan], from: TimeInterval, to: TimeInterval, skipping kinds: Set<AdSpan.Kind>, restored: Set<AdSpan>, window: TimeInterval = unzapWindow) -> [AdSpan] {
+        guard to < from else { return [] }
+
+        return spans.filter { span in
+            kinds.contains(span.kind)
+                && !restored.contains(span)
+                // Behind where playback was, and ending after where it lands, so it's landed in or jumped over
+                && span.start < from
+                && span.end > to
+                && from - span.end <= window
+        }
+    }
+
     /// Stops these ads being skipped again until the next launch
     func restore(_ spans: [AdSpan], in episodeUuid: String) {
         playbackState.withLock { $0.restoredSpans[episodeUuid, default: []].formUnion(spans) }

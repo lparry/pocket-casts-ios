@@ -6811,6 +6811,9 @@
 /* Kind of ad: the show asking for support, reviews, memberships or merch */
 "ad_skipping_kind_self_promo" = "Self-promotion";
 
+/* Kind of ad: a brief ident for the podcast's publisher or network, like a name and a sound effect, at the start or end of an episode */
+"ad_skipping_kind_network_branding" = "Network branding";
+
 /* Switch in a podcast's settings that turns Ad Zapping, which finds and skips ads, on or off for that podcast */
 "ad_skipping_scan_for_ads" = "Ad Zapping";
 

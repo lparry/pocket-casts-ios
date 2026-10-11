@@ -68,6 +68,12 @@ struct AdBoundaryRefiner {
 enum AudioBoundarySnapper {
     /// How far an edge can move
     static let searchRadius: TimeInterval = 2
+    /// A network ident is often one word and a longer sting, so its edges can move further, onto the sting's end
+    static let networkBrandingSearchRadius: TimeInterval = 5
+
+    static func searchRadius(for kind: AdSpan.Kind) -> TimeInterval {
+        kind == .networkBranding ? networkBrandingSearchRadius : searchRadius
+    }
     /// The length of each loudness measurement
     static let blockDuration: TimeInterval = 0.02
 
@@ -88,8 +94,9 @@ enum AudioBoundarySnapper {
 
         var movedEdges = 0
         let snapped = spans.map { span in
-            let start = snappedTime(near: span.start, allowed: startRange(for: span, words: words), in: file) ?? span.start
-            let end = snappedTime(near: span.end, allowed: endRange(for: span, words: words), in: file) ?? span.end
+            let radius = searchRadius(for: span.kind)
+            let start = snappedTime(near: span.start, allowed: startRange(for: span, words: words), radius: radius, in: file) ?? span.start
+            let end = snappedTime(near: span.end, allowed: endRange(for: span, words: words), radius: radius, in: file) ?? span.end
             movedEdges += (start != span.start ? 1 : 0) + (end != span.end ? 1 : 0)
             return AdSpan(start: start, end: end, kind: span.kind, sponsor: span.sponsor)
         }
@@ -99,19 +106,19 @@ enum AudioBoundarySnapper {
     /// From the end of the word before the ad, or the search radius, up to the ad's start
     static func startRange(for span: AdSpan, words: [TimedWord]) -> ClosedRange<TimeInterval> {
         let previousWordEnd = words.last { $0.end <= span.start }?.end ?? 0
-        return max(previousWordEnd, span.start - searchRadius)...span.start
+        return max(previousWordEnd, span.start - searchRadius(for: span.kind))...span.start
     }
 
     /// From the ad's end up to the start of the word after it, or the search radius
     static func endRange(for span: AdSpan, words: [TimedWord]) -> ClosedRange<TimeInterval> {
         let nextWordStart = words.first { $0.start >= span.end }?.start ?? .greatestFiniteMagnitude
-        return span.end...min(nextWordStart, span.end + searchRadius)
+        return span.end...min(nextWordStart, span.end + searchRadius(for: span.kind))
     }
 
-    private static func snappedTime(near time: TimeInterval, allowed: ClosedRange<TimeInterval>, in file: AVAudioFile) -> TimeInterval? {
+    private static func snappedTime(near time: TimeInterval, allowed: ClosedRange<TimeInterval>, radius: TimeInterval, in file: AVAudioFile) -> TimeInterval? {
         // Measure the whole neighbourhood, so silence is judged against the audio around it
-        let levelsStart = max(0, time - searchRadius)
-        guard allowed.upperBound > allowed.lowerBound, let levels = levels(in: file, from: levelsStart, to: time + searchRadius) else { return nil }
+        let levelsStart = max(0, time - radius)
+        guard allowed.upperBound > allowed.lowerBound, let levels = levels(in: file, from: levelsStart, to: time + radius) else { return nil }
         return snappedTime(near: time, allowed: allowed, levels: levels, levelsStart: levelsStart)
     }
 

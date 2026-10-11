@@ -1253,6 +1253,11 @@ class PlaybackManager: ServerPlaybackDelegate {
         player?.setPlaybackRate(effects.playbackSpeed)
 
         updateAllNowPlayingData()
+
+        // A short ident at the very start would be over by the first progress tick
+        DispatchQueue.main.async { [weak self] in
+            self?.checkForAdSkip()
+        }
     }
 
     enum PlaybackError: Error {

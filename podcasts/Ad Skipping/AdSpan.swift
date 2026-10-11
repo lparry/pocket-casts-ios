@@ -14,6 +14,8 @@ struct AdSpan: Codable, Equatable, Hashable {
         case crossPromo = "cross_promo"
         /// The show asking for support, reviews, Patreon or merch
         case selfPromo = "self_promo"
+        /// A brief publisher or network ident, like "Pushkin." and a sting, before the show starts or after it ends
+        case networkBranding = "network_branding"
     }
 
     let start: TimeInterval
@@ -27,7 +29,8 @@ struct AdSpan: Codable, Equatable, Hashable {
     }
 
     /// Anything shorter is almost certainly the hosts talking, not an ad. Real inserted ads on the listener's
-    /// phone were as short as 14.3s, and a broadcaster's own promos as short as 5.2s.
+    /// phone were as short as 14.3s, and a broadcaster's own promos as short as 5.2s. Network branding can be a single
+    /// word and a sting, so it's only kept at the very start or end of an episode instead (see `NetworkBranding`).
     var minimumDuration: TimeInterval {
         switch kind {
         case .hostRead, .inserted:
@@ -36,7 +39,14 @@ struct AdSpan: Codable, Equatable, Hashable {
             8
         case .selfPromo:
             5
+        case .networkBranding:
+            1
         }
+    }
+
+    /// Anything longer isn't just an ident, so it's likely the show's own intro or outro
+    var maximumDuration: TimeInterval? {
+        kind == .networkBranding ? 15 : nil
     }
 
     func contains(_ time: TimeInterval) -> Bool {
@@ -114,7 +124,10 @@ extension TranscriptSegment {
 /// The ads found in one downloaded episode, persisted so each download is only analysed once
 struct EpisodeAdAnalysis: Codable, Equatable {
     /// Bump to rescan every episode when the way ads are found improves
-    static let currentVersion = 3
+    static let currentVersion = 4
+    /// Analyses from this version on are still skipped while they wait to be scanned again. Version 3 is from before network
+    /// branding was looked for.
+    static let oldestUsableVersion = 3
 
     let version: Int
     let episodeUuid: String
@@ -169,6 +182,11 @@ struct AdScanTimings: Codable, Equatable {
 }
 
 extension EpisodeAdAnalysis {
+    /// Found before the latest improvements, so it's still used but scanned again when the scanning limits allow
+    var isDueRescan: Bool {
+        version < Self.currentVersion
+    }
+
     /// Whether this many ads couldn't be right: more than 40% of the episode, or more than 24 ad breaks an hour.
     /// Breaks are counted rather than ads, since several back-to-back ads in one break are common, joined the same way
     /// playback skips them. A real news episode on the listener's phone had 8 ads, 23% of its length, at about 19 an hour.
@@ -181,8 +199,9 @@ extension EpisodeAdAnalysis {
         return adTime / duration > 0.4 || (breaks > 6 && perHour > 24)
     }
 
+    /// Network branding is an extra moment at the start or end, so it isn't counted as a break
     static func breakCount(_ spans: [AdSpan]) -> Int {
-        let sorted = spans.sorted { $0.start < $1.start }
+        let sorted = spans.filter { $0.kind != .networkBranding }.sorted { $0.start < $1.start }
         return zip(sorted, sorted.dropFirst()).reduce(sorted.isEmpty ? 0 : 1) { count, pair in
             AdSkippingManager.isSameBreak(pair.0, pair.1) ? count : count + 1
         }

@@ -1171,3 +1171,116 @@ private extension URLRequest {
         return data
     }
 }
+
+final class NetworkBrandingTests: XCTestCase {
+    private let classifier = OpenRouterAdClassifier(apiKey: "", model: "")
+
+    /// One word every half a second from `start`, to `end`
+    private func words(from start: TimeInterval, to end: TimeInterval) -> [TimedWord] {
+        stride(from: start, to: end, by: 0.5).map { TimedWord(start: $0, end: $0 + 0.4, text: "word") }
+    }
+
+    private func branding(_ start: TimeInterval, _ end: TimeInterval) -> AdSpan {
+        AdSpan(start: start, end: end, kind: .networkBranding, sponsor: "Pushkin")
+    }
+
+    func testKeepsBrandingAfterThePreRollAds() {
+        // Ads from 0 to 30, "Pushkin" and a sting, then the show
+        let ad = AdSpan(start: 0, end: 30, kind: .inserted, sponsor: nil)
+        let spans = [ad, branding(31, 33)]
+        let words = words(from: 0, to: 30) + [TimedWord(start: 31, end: 31.6, text: "Pushkin.")] + words(from: 34, to: 600)
+
+        let cleaned = classifier.cleanedUp(spans, duration: 600, words: words)
+
+        XCTAssertEqual(cleaned, spans)
+    }
+
+    func testKeepsBrandingAtTheEnd() {
+        let spans = [branding(590, 594)]
+        // The show, then "This is the Guardian." and a sting to the end
+        let words = words(from: 0, to: 589) + [TimedWord(start: 590, end: 590.5, text: "This"), TimedWord(start: 590.5, end: 590.8, text: "is"), TimedWord(start: 590.8, end: 591, text: "the"), TimedWord(start: 591, end: 591.6, text: "Guardian.")]
+
+        let cleaned = classifier.cleanedUp(spans, duration: 600, words: words)
+
+        // Nothing is said after it, so it runs on to the end
+        XCTAssertEqual(cleaned, [branding(590, 600)])
+    }
+
+    func testDropsBrandingInTheMiddleOfTheShow() {
+        let spans = [branding(300, 302)]
+
+        XCTAssertEqual(classifier.cleanedUp(spans, duration: 600, words: words(from: 0, to: 600)), [])
+    }
+
+    func testStartsBrandingWithNothingSaidBeforeItAtZero() {
+        // A sting, then "Pushkin." at 2s, then the show
+        let words = [TimedWord(start: 2, end: 2.6, text: "Pushkin.")] + words(from: 5, to: 600)
+
+        XCTAssertEqual(classifier.cleanedUp([branding(2, 3)], duration: 600, words: words), [branding(0, 3)])
+    }
+
+    func testDropsBrandingShorterThanASecondOrLongerThan15Seconds() {
+        // Near the end, but with a couple of words after it, so it isn't stretched to the end
+        let ending = words(from: 0, to: 100) + [TimedWord(start: 101, end: 101.4, text: "Goodbye"), TimedWord(start: 101.5, end: 102, text: "everyone.")]
+        XCTAssertEqual(classifier.cleanedUp([branding(100, 100.5)], duration: 103, words: ending), [])
+        XCTAssertEqual(classifier.cleanedUp([branding(100, 101)], duration: 103, words: ending), [branding(100, 101)])
+
+        let opening = words(from: 21, to: 600)
+        XCTAssertEqual(classifier.cleanedUp([branding(0, 20)], duration: 600, words: opening), [])
+    }
+
+    func testLeavesShortBrandingForLaterBeforeItsEdgesArePlaced() {
+        // The transcript line for one word can be shorter than the ident and its sting
+        XCTAssertEqual(classifier.cleanedUp([branding(0.2, 0.8)], duration: 600), [branding(0.2, 0.8)])
+        // Other kinds are as strict as ever
+        XCTAssertEqual(classifier.cleanedUp([AdSpan(start: 0, end: 4, kind: .selfPromo, sponsor: nil)], duration: 600), [])
+    }
+
+    func testSkipsAShortIdentAtTheStart() {
+        let ident = branding(0, 1.6)
+        let kinds = Set(AdSpan.Kind.allCases)
+
+        XCTAssertEqual(AdSkippingManager.adSkip(in: [ident], at: 0, skipping: kinds, restored: [])?.end, 1.6)
+        // Even by the first progress tick
+        XCTAssertEqual(AdSkippingManager.adSkip(in: [ident], at: 1, skipping: kinds, restored: [])?.end, 1.6)
+        // The last moment of a longer ad still isn't worth skipping
+        XCTAssertNil(AdSkippingManager.adSkip(in: [AdSpan(start: 0, end: 30, kind: .inserted, sponsor: nil)], at: 29.5, skipping: kinds, restored: []))
+    }
+
+    func testDoesntCountBrandingAsAnAdBreak() {
+        let ads = [branding(0, 3), AdSpan(start: 300, end: 330, kind: .inserted, sponsor: nil), branding(590, 600)]
+
+        XCTAssertEqual(EpisodeAdAnalysis.breakCount(ads), 1)
+    }
+
+    func testSkipsBrandingForListenersWhoHadAlreadyChosenKinds() throws {
+        let suiteName = "NetworkBrandingTests"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(AdSkippingManager.loadSkippedKinds(from: defaults), Set(AdSpan.Kind.allCases))
+
+        // Chosen before network branding was a kind
+        defaults.set(["host_read", "inserted"], forKey: "AdSkippingSkippedKinds")
+        XCTAssertEqual(AdSkippingManager.loadSkippedKinds(from: defaults), [.hostRead, .inserted, .networkBranding])
+
+        // Turned off since
+        defaults.set(AdSpan.Kind.allCases.map(\.rawValue), forKey: "AdSkippingKnownKinds")
+        XCTAssertEqual(AdSkippingManager.loadSkippedKinds(from: defaults), [.hostRead, .inserted])
+    }
+
+    func testKeepsUsingOlderAnalysesUntilTheyreScannedAgain() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let old = EpisodeAdAnalysis(version: 3, episodeUuid: "old", analyzedAt: Date(), classifier: "openrouter:test/model", audioFileSize: 1, transcriptSegmentCount: 1, spans: [AdSpan(start: 10, end: 40, kind: .inserted, sponsor: nil)])
+        try AdSpanStore(directory: directory).save(old)
+
+        let reloaded = try XCTUnwrap(AdSpanStore(directory: directory).analysis(for: "old"))
+        XCTAssertEqual(reloaded.spans, old.spans)
+        XCTAssertTrue(reloaded.isDueRescan)
+
+        let current = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion, episodeUuid: "new", analyzedAt: Date(), classifier: "openrouter:test/model", audioFileSize: 1, transcriptSegmentCount: 1, spans: [])
+        XCTAssertFalse(current.isDueRescan)
+    }
+}

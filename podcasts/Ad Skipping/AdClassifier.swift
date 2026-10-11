@@ -44,13 +44,24 @@ struct AdBoundaryRequest {
 }
 
 extension AdClassifier {
-    /// Drops spans too short to be ads of their kind, clamps them to the episode, and merges any that overlap.
+    /// Drops spans too short or too long to be ads of their kind, clamps them to the episode, and merges any that overlap.
     /// Short spans go first, so they can't be joined into a longer skip.
-    func cleanedUp(_ spans: [AdSpan], duration: TimeInterval) -> [AdSpan] {
+    ///
+    /// Network branding is only judged once the episode's `words` are given, after its edges have been placed: the
+    /// transcript line for a one word ident can be shorter than the ident and its sting.
+    func cleanedUp(_ spans: [AdSpan], duration: TimeInterval, words: [TimedWord]? = nil) -> [AdSpan] {
         let upperBound = duration > 0 ? duration : .greatestFiniteMagnitude
-        let clamped = spans
+        var clamped = spans
             .map { AdSpan(start: max(0, $0.start), end: min($0.end, upperBound), kind: $0.kind, sponsor: $0.sponsor?.isEmpty == false ? $0.sponsor : nil) }
-            .filter { $0.duration >= $0.minimumDuration }
+        if let words {
+            clamped = NetworkBranding.placed(clamped, words: words, duration: duration)
+        }
+        clamped = clamped
+            .filter { span in
+                let isTooShort = span.duration < span.minimumDuration && (words != nil || span.kind != .networkBranding)
+                let isTooLong = span.maximumDuration.map { span.duration > $0 } ?? false
+                return !isTooShort && !isTooLong
+            }
             .sorted { $0.start < $1.start }
 
         var merged: [AdSpan] = []
@@ -62,6 +73,35 @@ extension AdClassifier {
             }
         }
         return merged
+    }
+}
+
+/// Short publisher idents, like "Pushkin." or "This is the Guardian.", only come before the show starts or after it ends,
+/// so they're only kept there. Anywhere else a short span is far more likely to be the show itself.
+enum NetworkBranding {
+    /// How many words of the show can come between an ident and the start or end of the episode. Words in other ads
+    /// don't count, so an ident after the pre-roll ads is kept.
+    static let maximumShowWordsOutside = 3
+
+    /// Drops network branding that isn't at the start or end of the episode, and stretches an ident with no words
+    /// before it back to the start, or with no words after it on to the end, over the sting or music around it
+    static func placed(_ spans: [AdSpan], words: [TimedWord], duration: TimeInterval) -> [AdSpan] {
+        spans.enumerated().compactMap { index, span in
+            guard span.kind == .networkBranding else { return span }
+
+            let others = spans.enumerated().filter { $0.offset != index }.map(\.element)
+            let showWords = words.filter { word in
+                let middle = (word.start + word.end) / 2
+                return !span.contains(middle) && !others.contains { $0.contains(middle) }
+            }
+            let isAtStart = showWords.filter { $0.end <= span.start }.count <= maximumShowWordsOutside
+            let isAtEnd = showWords.filter { $0.start >= span.end }.count <= maximumShowWordsOutside
+            guard isAtStart || isAtEnd else { return nil }
+
+            let start = words.contains { $0.end <= span.start } ? span.start : 0
+            let end = words.contains { $0.start >= span.end } || duration <= 0 ? span.end : max(span.end, duration)
+            return AdSpan(start: start, end: end, kind: span.kind, sponsor: span.sponsor)
+        }
     }
 }
 
@@ -78,12 +118,17 @@ enum AdClassifierPrompt {
     - inserted: a produced or dynamically inserted ad, often in a different voice from the hosts.
     - cross_promo: a trailer or promo for another show.
     - self_promo: the show asking for support, reviews, Patreon, memberships or merch.
+    - network_branding: a brief ident for the podcast's publisher or network before the show starts or after it ends, \
+    often a single line and a sound effect, like "Pushkin." or "This is the Guardian." The show's own title, theme \
+    or intro is not network branding, and neither is a host mentioning the network in conversation. It never comes in \
+    the middle of the show.
 
     Start each span at the first line of the ad, including lead-ins like "we'll be right back", "after the break", \
     "a word from our sponsors" or "this episode is brought to you by". End it at the end of the last ad line, including \
     outros like "now back to the show" or "thanks to our sponsor", before the show resumes. Take start and end times \
     from the line boundaries. Give back-to-back ads for different sponsors their own spans, each running right up to \
-    the next. Don't include the show's own content, its intro or outro, or a host mentioning a brand in conversation. \
+    the next. Don't include the show's own content, its intro or outro, or a host mentioning a brand in conversation, \
+    though a network ident before the intro or after the outro is network_branding. \
     `sponsor` is the advertised brand or show, or an empty string if it's unclear. If there are no ads, return an empty \
     list.
     """

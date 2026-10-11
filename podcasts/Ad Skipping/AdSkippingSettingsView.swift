@@ -175,6 +175,8 @@ extension AdSpan.Kind {
             L10n.adSkippingKindCrossPromo
         case .selfPromo:
             L10n.adSkippingKindSelfPromo
+        case .networkBranding:
+            L10n.adSkippingKindNetworkBranding
         }
     }
 }

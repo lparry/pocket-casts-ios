@@ -401,14 +401,23 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
             return state.skippedKinds
         }
         UserDefaults.standard.set(kinds.map(\.rawValue).sorted(), forKey: Self.skippedKindsDefaultsKey)
+        UserDefaults.standard.set(AdSpan.Kind.allCases.map(\.rawValue), forKey: Self.knownKindsDefaultsKey)
         objectWillChange.send()
     }
 
-    private static func loadSkippedKinds() -> Set<AdSpan.Kind> {
-        guard let rawValues = UserDefaults.standard.stringArray(forKey: skippedKindsDefaultsKey) else {
+    /// The kinds there were when the listener last chose which to skip, so a kind added since is skipped like the rest
+    private static let knownKindsDefaultsKey = "AdSkippingKnownKinds"
+    /// The kinds there were before `knownKindsDefaultsKey` was saved
+    private static let originalKinds: Set<AdSpan.Kind> = [.hostRead, .inserted, .crossPromo, .selfPromo]
+
+    static func loadSkippedKinds(from defaults: UserDefaults = .standard) -> Set<AdSpan.Kind> {
+        guard let rawValues = defaults.stringArray(forKey: skippedKindsDefaultsKey) else {
             return Set(AdSpan.Kind.allCases)
         }
-        return Set(rawValues.compactMap(AdSpan.Kind.init(rawValue:)))
+
+        let known = defaults.stringArray(forKey: knownKindsDefaultsKey).map { Set($0.compactMap(AdSpan.Kind.init(rawValue:))) } ?? originalKinds
+        let newKinds = Set(AdSpan.Kind.allCases).subtracting(known)
+        return Set(rawValues.compactMap(AdSpan.Kind.init(rawValue:))).union(newKinds)
     }
 
     // MARK: - Podcasts
@@ -507,8 +516,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         }
 
         let skip = AdSkip(spans: joined)
-        // Don't bother skipping the last moment of an ad
-        return skip.end - time > 1 ? skip : nil
+        // Don't bother skipping the last moment of an ad, though a short ident is mostly that
+        return skip.end - time > min(1, (skip.end - skip.start) / 4) ? skip : nil
     }
 
     /// How long after an ad ends a skip back over it still counts as wanting to hear it
@@ -666,7 +675,8 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         let classifiersKey = Self.classifiersKey(classifiers)
         let episodes = downloaded.filter { isScanning($0) }
         let episodesByUuid = Dictionary(episodes.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
-        let skipped = Set(episodes.filter { currentAnalysis(for: $0) != nil || hasKnownFailure($0, classifiers: classifiersKey) }.map(\.uuid))
+        let analyses = Dictionary(episodes.compactMap { episode in currentAnalysis(for: episode).map { (episode.uuid, $0) } }, uniquingKeysWith: { first, _ in first })
+        let skipped = Set(episodes.filter { analyses[$0.uuid].map { !$0.isDueRescan } ?? false || hasKnownFailure($0, classifiers: classifiersKey) }.map(\.uuid))
         let (nowPlaying, upNext) = currentUpNext()
         let ordered = Self.scanOrder(downloaded: episodes.map(\.uuid), upNext: Self.upNextOrder(nowPlaying: nowPlaying, upNext: upNext))
         let window = currentDetectionWindow()
@@ -682,7 +692,13 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
                 continue
             }
 
-            switch nextStep(for: episode, window: window, conditions: conditions) {
+            let step = nextStep(for: episode, window: window, conditions: conditions)
+            // An older analysis keeps being skipped until it can be scanned again, so it isn't shown as waiting
+            if analyses[uuid] != nil, case .wait = step {
+                continue
+            }
+
+            switch step {
             case .transcribe:
                 toScan[.transcription]?.append(uuid)
                 newStatuses[uuid] = .queued
@@ -1090,7 +1106,7 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         timings.snappedEdges = snapped.movedEdges
         timings.edgeCount = refinedSpans.count * 2
         timings.audioUnreadable = !snapped.couldReadFile
-        let spans = classifier.cleanedUp(snappedSpans, duration: context.duration)
+        let spans = classifier.cleanedUp(snappedSpans, duration: context.duration, words: words)
 
         FileLog.shared.addMessage("AdSkipping: timings for \(uuid): \(timings.logDescription)")
 

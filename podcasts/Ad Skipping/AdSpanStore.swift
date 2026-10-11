@@ -51,7 +51,7 @@ final class AdSpanStore {
     private func load(_ episodeUuid: String) -> EpisodeAdAnalysis? {
         guard let data = try? Data(contentsOf: fileURL(for: episodeUuid)) else { return nil }
 
-        guard let analysis = try? JSONDecoder().decode(EpisodeAdAnalysis.self, from: data), Self.isCurrent(analysis) else {
+        guard let analysis = try? JSONDecoder().decode(EpisodeAdAnalysis.self, from: data), Self.isUsable(analysis) else {
             FileLog.shared.addMessage("AdSpanStore: discarding unreadable analysis for \(episodeUuid)")
             return nil
         }
@@ -59,10 +59,11 @@ final class AdSpanStore {
         return analysis
     }
 
+    /// Older analyses are kept, and skipped, until they're scanned again (see `EpisodeAdAnalysis.isDueRescan`).
     /// Version 2 analyses could fall back to the on-device model when OpenRouter couldn't be reached, so only those found by
-    /// OpenRouter are kept. The rest are scanned again, reusing their transcripts.
-    static func isCurrent(_ analysis: EpisodeAdAnalysis) -> Bool {
-        analysis.version == EpisodeAdAnalysis.currentVersion
+    /// OpenRouter are kept. The rest are scanned again straight away, reusing their transcripts.
+    static func isUsable(_ analysis: EpisodeAdAnalysis) -> Bool {
+        (EpisodeAdAnalysis.oldestUsableVersion...EpisodeAdAnalysis.currentVersion).contains(analysis.version)
             || (analysis.version == 2 && analysis.classifier.hasPrefix(OpenRouterAdClassifier.identifierPrefix))
     }
 

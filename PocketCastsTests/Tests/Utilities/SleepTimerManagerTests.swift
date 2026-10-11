@@ -1,5 +1,5 @@
 import XCTest
-import PocketCastsUtils
+@testable import PocketCastsUtils
 @testable import podcasts
 
 final class SleepTimerManagerTests: XCTestCase {
@@ -10,9 +10,11 @@ final class SleepTimerManagerTests: XCTestCase {
     private var manager: SleepTimerManager!
     private var currentDate: Date!
     private var calendar: Calendar!
+    private let flags = FeatureFlagMock()
 
     override func setUp() {
         super.setUp()
+        flags.set(.sleepTimerTimeOfDay, value: true)
         suiteName = "SleepTimerManagerTests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         preferences = .init(userDefaults: defaults)
@@ -31,6 +33,7 @@ final class SleepTimerManagerTests: XCTestCase {
     override func tearDown() {
         manager = nil
         defaults.removePersistentDomain(forName: suiteName)
+        flags.reset()
         super.tearDown()
     }
 
@@ -78,7 +81,7 @@ final class SleepTimerManagerTests: XCTestCase {
     func testRepeatedPlaybackStartsDoNotExtendTimer() {
         manager.restartSleepTimerIfNeeded()
         manager.restartSleepTimerIfNeeded()
-        manager.restartSleepTimerIfNeeded(userInitiated: false)
+        manager.restartSleepTimerIfNeeded()
         XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
@@ -91,25 +94,70 @@ final class SleepTimerManagerTests: XCTestCase {
         XCTAssertEqual(playback.startedDurations, [10.minutes, 10.minutes])
     }
 
-    func testManualCancellationSurvivesAutomaticEpisodeChangesUntilDeliberatePlay() {
+    func testCancellingDuringWindowHoldsOffUntilWindowEnds() {
         manager.cancelSleepTimer(userInitiated: true)
-        manager.restartSleepTimerIfNeeded(userInitiated: false)
-        manager.restartSleepTimerIfNeeded(userInitiated: false)
+        manager.restartSleepTimerIfNeeded()
+        currentDate = date(day: 4, hour: 6, minute: 59)
+        manager.restartSleepTimerIfNeeded()
         XCTAssertTrue(playback.startedDurations.isEmpty)
-        manager.restartSleepTimerIfNeeded(userInitiated: true)
+
+        currentDate = date(day: 4, hour: 22)
+        manager.restartSleepTimerIfNeeded()
         XCTAssertEqual(playback.startedDurations, [10.minutes])
+    }
+
+    func testCancellationHoldOffSurvivesRelaunch() {
+        manager.cancelSleepTimer(userInitiated: true)
+        let reloaded = SleepTimerManager(preferences: .init(userDefaults: defaults),
+                                        playback: { [unowned self] in self.playback },
+                                        now: { [unowned self] in self.currentDate },
+                                        calendar: { [unowned self] in self.calendar })
+        reloaded.restartSleepTimerIfNeeded()
+        XCTAssertTrue(playback.startedDurations.isEmpty)
+    }
+
+    func testCancellingOutsideWindowDoesNotHoldOffNextWindow() {
+        currentDate = date(hour: 12)
+        manager.cancelSleepTimer(userInitiated: true)
+        currentDate = date(hour: 22)
+        manager.restartSleepTimerIfNeeded()
+        XCTAssertEqual(playback.startedDurations, [10.minutes])
+    }
+
+    func testAutomaticStartsAreNotReportedAsEnabledByListener() {
+        manager.restartSleepTimerIfNeeded()
+        playback.active = false
+        preferences.mode = .afterTimerEnds
+        preferences.finishedDate = currentDate
+        manager.restartSleepTimerIfNeeded()
+        playback.active = true
+        manager.restartSleepTimer()
+        XCTAssertEqual(playback.automaticStarts, [true, true, false])
+    }
+
+    func testTimeOfDayBehavesLikeAfterTimerEndsWithoutFeatureFlag() {
+        let disabled = FeatureFlagMock()
+        disabled.set(.sleepTimerTimeOfDay, value: false)
+        defer { disabled.reset() }
+
+        XCTAssertEqual(preferences.mode, .afterTimerEnds)
+        manager.restartSleepTimerIfNeeded()
+        XCTAssertTrue(playback.startedDurations.isEmpty)
+        preferences.finishedDate = currentDate
+        manager.restartSleepTimerIfNeeded()
+        XCTAssertEqual(playback.startedDurations, [5.minutes])
     }
 
     func testInternalCancellationDoesNotSuppressAutomaticActivation() {
         manager.cancelSleepTimer(userInitiated: false)
-        manager.restartSleepTimerIfNeeded(userInitiated: false)
+        manager.restartSleepTimerIfNeeded()
         XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
     func testChoosingAnotherTimerClearsManualCancellation() {
         manager.cancelSleepTimer(userInitiated: true)
         manager.recordSleepTimerDuration(duration: 15.minutes, onEpisodeEnd: nil)
-        manager.restartSleepTimerIfNeeded(userInitiated: false)
+        manager.restartSleepTimerIfNeeded()
         XCTAssertEqual(playback.startedDurations, [10.minutes])
     }
 
@@ -177,10 +225,10 @@ final class SleepTimerManagerTests: XCTestCase {
                 manager.recordSleepTimerFinished(episodeUuid: "finished")
 
                 manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
-                manager.restartSleepTimerIfNeeded(userInitiated: false, episodeUuid: "finished")
+                manager.restartSleepTimerIfNeeded(episodeUuid: "finished")
                 XCTAssertTrue(playback.startedEpisodeCounts.isEmpty)
 
-                manager.restartSleepTimerIfNeeded(userInitiated: false, episodeUuid: "next")
+                manager.restartSleepTimerIfNeeded(episodeUuid: "next")
                 XCTAssertEqual(playback.startedEpisodeCounts, [count])
             }
         }
@@ -197,7 +245,7 @@ final class SleepTimerManagerTests: XCTestCase {
 
         reloaded.restartSleepTimerIfNeeded(episodeUuid: "finished")
         XCTAssertTrue(playback.startedEpisodeCounts.isEmpty)
-        reloaded.restartSleepTimerIfNeeded(userInitiated: false, episodeUuid: "next")
+        reloaded.restartSleepTimerIfNeeded(episodeUuid: "next")
         XCTAssertEqual(playback.startedEpisodeCounts, [1])
     }
 
@@ -343,6 +391,16 @@ final class SleepTimerManagerTests: XCTestCase {
         XCTAssertFalse(window.contains(formatter.date(from: "2026-03-08T07:00:00Z")!, calendar: calendar))
     }
 
+    func testWindowEndIsNextEndTimeAfterDateInsideWindow() {
+        let overnight = SleepTimerManager.TimeWindow.defaultWindow
+        XCTAssertEqual(overnight.end(ofWindowContaining: date(hour: 23), calendar: calendar), date(day: 4, hour: 7))
+        XCTAssertEqual(overnight.end(ofWindowContaining: date(hour: 1), calendar: calendar), date(hour: 7))
+        XCTAssertNil(overnight.end(ofWindowContaining: date(hour: 12), calendar: calendar))
+
+        let sameDay = SleepTimerManager.TimeWindow(startMinute: 10 * 60 + 15, endMinute: 14 * 60 + 30)
+        XCTAssertEqual(sameDay.end(ofWindowContaining: date(hour: 11), calendar: calendar), date(hour: 14, minute: 30))
+    }
+
     func testInvalidWindowNeverActivates() {
         for window in [SleepTimerManager.TimeWindow(startMinute: 0, endMinute: 0),
                        .init(startMinute: -1, endMinute: 60),
@@ -352,19 +410,21 @@ final class SleepTimerManagerTests: XCTestCase {
         }
     }
 
-    private func date(hour: Int, minute: Int = 0, second: Int = 0) -> Date {
-        calendar.date(from: DateComponents(year: 2026, month: 10, day: 3, hour: hour, minute: minute, second: second))!
+    private func date(day: Int = 3, hour: Int, minute: Int = 0, second: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute, second: second))!
     }
 
     private final class PlaybackSpy: SleepTimerPlayback {
         var active = false
         var startedDurations: [TimeInterval] = []
         var startedEpisodeCounts: [Int] = []
+        var automaticStarts: [Bool] = []
 
         func sleepTimerActive() -> Bool { active }
 
-        func setSleepTimerInterval(_ stopIn: TimeInterval) {
+        func setSleepTimerInterval(_ stopIn: TimeInterval, automatic: Bool) {
             startedDurations.append(stopIn)
+            automaticStarts.append(automatic)
             active = true
         }
 

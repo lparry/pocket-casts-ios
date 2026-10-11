@@ -305,9 +305,21 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
 
             return cell
         case .autoRestartSleepTimer:
-            let cell = tableView.dequeueReusableCell(withIdentifier: disclosureCellId, for: indexPath) as! DisclosureCell
-            cell.cellLabel.text = L10n.sleepTimerAutomaticTitle
-            cell.cellSecondaryLabel.text = Settings.automaticSleepTimerMode.title
+            if FeatureFlag.sleepTimerTimeOfDay.enabled {
+                let cell = tableView.dequeueReusableCell(withIdentifier: disclosureCellId, for: indexPath) as! DisclosureCell
+                cell.cellLabel.text = L10n.sleepTimerAutomaticTitle
+                cell.cellSecondaryLabel.text = Settings.automaticSleepTimerMode.title
+                return cell
+            }
+
+            let cell = tableView.dequeueReusableCell(withIdentifier: switchCellId, for: indexPath) as! SwitchCell
+
+            cell.cellLabel.text = L10n.autoRestartSleepTimer
+            cell.cellSwitch.isOn = Settings.automaticSleepTimerMode != .off
+
+            cell.cellSwitch.removeTarget(self, action: nil, for: .valueChanged)
+            cell.cellSwitch.addTarget(self, action: #selector(autoRestartSleepTimerToggled(_:)), for: .valueChanged)
+
             return cell
         case .shakeToRestartSleepTimer:
             let cell = tableView.dequeueReusableCell(withIdentifier: switchCellId, for: indexPath) as! SwitchCell
@@ -356,7 +368,7 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
         tableView.deselectRow(at: indexPath, animated: true)
 
         let row = tableData[indexPath.section][indexPath.row]
-        if row == .autoRestartSleepTimer {
+        if row == .autoRestartSleepTimer, FeatureFlag.sleepTimerTimeOfDay.enabled {
             navigationController?.pushViewController(SleepTimerSettingsViewController(), animated: true)
         } else if row == .defaultRowAction {
             let currentAction = Settings.primaryRowAction
@@ -497,7 +509,11 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
         case .audioOnly:
             return L10n.settingsGeneralAudioOnlySubtitle
         case .autoRestartSleepTimer:
-            return Settings.automaticSleepTimerMode.explanation
+            guard FeatureFlag.sleepTimerTimeOfDay.enabled else {
+                return L10n.autoRestartSleepTimerDescription
+            }
+            let preferences = SleepTimerManager.Preferences()
+            return preferences.mode.explanation(for: preferences.timeWindow)
         case .shakeToRestartSleepTimer:
             return L10n.shakeToRestartSleepTimerDescription
         case .voiceBoostN:
@@ -618,6 +634,12 @@ class GeneralSettingsViewController: PCViewController, UITableViewDelegate, UITa
         ServerSettings.syncSettings()
 
         Settings.trackValueToggled(.settingsGeneralAudioOnlyToggled, enabled: sender.isOn)
+    }
+
+    @objc private func autoRestartSleepTimerToggled(_ sender: UISwitch) {
+        Settings.automaticSleepTimerMode = sender.isOn ? .afterTimerEnds : .off
+
+        Settings.trackValueToggled(.settingsGeneralAutoSleepTimerRestartToggled, enabled: sender.isOn)
     }
 
     @objc private func shakeToRestartSleepTimerToggled(_ sender: UISwitch) {

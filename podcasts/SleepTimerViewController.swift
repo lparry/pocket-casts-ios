@@ -310,7 +310,11 @@ class SleepTimerViewController: SimpleNotificationsViewController {
     @IBAction func settingsTapped(_ sender: Any) {
         Analytics.track(.playerSleepTimerSettingsTapped)
 #if !APPCLIP
-        NavigationManager.shared.navigateTo(NavigationManager.settingsSleepTimerKey)
+        if FeatureFlag.sleepTimerTimeOfDay.enabled {
+            NavigationManager.shared.navigateTo(NavigationManager.settingsSleepTimerKey)
+        } else {
+            NavigationManager.shared.navigateTo(NavigationManager.settingsGeneralKey, data: [NavigationManager.settingsGeneralRowKey: GeneralSettingsViewController.TableRow.autoRestartSleepTimer])
+        }
 #endif
     }
 

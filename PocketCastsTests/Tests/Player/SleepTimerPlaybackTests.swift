@@ -15,6 +15,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
         Constants.UserDefaults.automaticSleepTimerSetting,
         Constants.UserDefaults.sleepTimerFinishedDate,
         Constants.UserDefaults.sleepTimerFinishedEpisodeUuid,
+        Constants.UserDefaults.automaticSleepTimerHeldUntil,
         Constants.UserDefaults.autoplay
     ]
 
@@ -28,6 +29,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
             Settings.autoplay = false
             flags.set(.doNotSwitchToDownloadedFile, value: false)
             flags.set(.sleepTimerLiveActivity, value: false)
+            flags.set(.sleepTimerTimeOfDay, value: true)
             let components = Calendar.current.dateComponents([.hour, .minute], from: .now)
             let minute = components.hour! * 60 + components.minute!
             preferences.mode = .timeWindow
@@ -94,7 +96,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
     }
 
     @MainActor
-    func testDownloadReloadPreservesCancellationUntilDeliberatePlay() async {
+    func testCancellationHoldsThroughReloadsAndResumingDuringWindow() async {
         let playback = PlaybackManager.shared
         preferences.automaticTimer = .init(duration: 1800, sleepOnEpisodeEnd: nil)
         await startPlayback { playback.load(episode: episode, autoPlay: true, overrideUpNext: true) }
@@ -108,7 +110,7 @@ final class SleepTimerPlaybackTests: DBTestCase {
 
         playback.pause()
         await startPlayback { playback.play() }
-        XCTAssertTrue(playback.sleepTimerActive())
+        XCTAssertFalse(playback.sleepTimerActive())
     }
 
     @MainActor

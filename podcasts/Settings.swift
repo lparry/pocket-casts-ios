@@ -411,12 +411,8 @@ class Settings: NSObject {
     }
 
     static var sleepTimerNumberOfEpisodes: Int {
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes) as? Int ?? 1
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes)
-        }
+        get { SleepTimerManager.Preferences().numberOfEpisodes }
+        set { SleepTimerManager.Preferences().numberOfEpisodes = newValue }
     }
 
     // MARK: - CarPlay/Lock Screen actions
@@ -859,28 +855,6 @@ class Settings: NSObject {
         UserDefaults.standard.bool(forKey: Constants.UserDefaults.analyticsOptOut)
     }
 
-    // MARK: - Sleep Timer (internal)
-
-    class var sleepTimerFinishedDate: Date? {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.sleepTimerFinishedDate)
-        }
-
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.sleepTimerFinishedDate) as? Date
-        }
-    }
-
-    class var sleepTimerLastSetting: SleepTimerManager.SleepTimerSetting? {
-        set {
-            UserDefaults.standard.setJSONObject(newValue, forKey: Constants.UserDefaults.sleepTimerSetting)
-        }
-
-        get {
-            try? UserDefaults.standard.jsonObject(SleepTimerManager.SleepTimerSetting.self, forKey: Constants.UserDefaults.sleepTimerSetting)
-        }
-    }
-
     // MARK: - End of Year 2022
 
     class func showBadgeForEndOfYear(_ year: Int) -> Bool {
@@ -1015,11 +989,6 @@ class Settings: NSObject {
     static var automaticSleepTimerMode: SleepTimerManager.AutomaticMode {
         get { SleepTimerManager.Preferences().mode }
         set { SleepTimerManager.Preferences().mode = newValue }
-    }
-
-    static var sleepTimerTimeWindow: SleepTimerManager.TimeWindow {
-        get { SleepTimerManager.Preferences().timeWindow }
-        set { SleepTimerManager.Preferences().timeWindow = newValue }
     }
 
     static var shakeToRestartSleepTimer: Bool {

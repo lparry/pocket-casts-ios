@@ -37,7 +37,16 @@ class BackgroundShakeObserver {
     @objc private func sleepTimerChanged() {
         if !PlaybackManager.shared.sleepTimerActive() {
             stopObserving()
+            return
         }
+
+        #if !os(watchOS) && !APPCLIP
+        // A timer can start while the app is already in the background, such as an automatic one
+        // when playback starts from the Lock Screen, so start observing then too.
+        if UIApplication.shared.applicationState == .background, !manager.isDeviceMotionActive {
+            appMovedToBackground()
+        }
+        #endif
     }
 
     func startObserving() {

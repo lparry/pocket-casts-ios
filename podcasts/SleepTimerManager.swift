@@ -5,7 +5,7 @@ import AVKit
 
 protocol SleepTimerPlayback {
     func sleepTimerActive() -> Bool
-    func setSleepTimerInterval(_ stopIn: TimeInterval)
+    func setSleepTimerInterval(_ stopIn: TimeInterval, automatic: Bool)
     func setSleepTimerEpisodeCount(_ count: Int)
 }
 
@@ -17,7 +17,6 @@ class SleepTimerManager {
     private let playback: () -> SleepTimerPlayback
     private let now: () -> Date
     private let calendar: () -> Calendar
-    private var cancelledForCurrentSession = false
 
     private lazy var tonePlayer: AVAudioPlayer? = {
         guard let url = Bundle.main.url(forResource: "sleep-timer-restarted-sound", withExtension: "mp3") else {
@@ -70,7 +69,7 @@ class SleepTimerManager {
         let setting = SleepTimerSetting(duration: duration, sleepOnEpisodeEnd: onEpisodeEnd, numberOfEpisodes: numberOfEpisodes)
         preferences.lastSetting = setting
         preferences.finishedEpisodeUuid = nil
-        cancelledForCurrentSession = false
+        preferences.automaticTimerHeldUntil = nil
     }
 
     func cancelSleepTimer(userInitiated: Bool) {
@@ -79,15 +78,14 @@ class SleepTimerManager {
         }
 
         preferences.finishedDate = .distantPast
-        cancelledForCurrentSession = true
+        // Cancelling during the chosen hours means no timer tonight, so hold off until they end.
+        if preferences.mode == .timeWindow {
+            preferences.automaticTimerHeldUntil = preferences.timeWindow.end(ofWindowContaining: now(), calendar: calendar())
+        }
     }
 
-    func restartSleepTimerIfNeeded(userInitiated: Bool = true, episodeUuid: String? = nil) {
-        if userInitiated {
-            cancelledForCurrentSession = false
-        }
-
-        guard !playback().sleepTimerActive(), !cancelledForCurrentSession else { return }
+    func restartSleepTimerIfNeeded(episodeUuid: String? = nil) {
+        guard !playback().sleepTimerActive() else { return }
 
         let currentDate = now()
         let setting: SleepTimerSetting
@@ -101,6 +99,7 @@ class SleepTimerManager {
             setting = lastSetting
         case .timeWindow:
             guard preferences.timeWindow.contains(currentDate, calendar: calendar()) else { return }
+            if let heldUntil = preferences.automaticTimerHeldUntil, currentDate < heldUntil { return }
             setting = preferences.automaticTimer
         }
 
@@ -110,13 +109,13 @@ class SleepTimerManager {
             return
         }
 
-        activate(setting: setting, reason: preferences.mode == .timeWindow ? "time_window" : "recent_timer")
+        activate(setting: setting, mode: preferences.mode)
     }
 
     func restartSleepTimer() {
         if let setting = preferences.lastSetting {
             if let duration = setting.duration {
-                playback().setSleepTimerInterval(duration)
+                playback().setSleepTimerInterval(duration, automatic: false)
                 Analytics.track(.playerSleepTimerRestarted, properties: ["time": duration, "reason": "device_shake"])
                 FileLog.shared.addMessage("Sleep Timer: restarting it after device shake")
             }
@@ -128,19 +127,21 @@ class SleepTimerManager {
         fadeOutManager.fadeOut(duration: sleepTimerFadeDuration)
     }
 
-    private func activate(setting: SleepTimerSetting, reason: String) {
+    private func activate(setting: SleepTimerSetting, mode: AutomaticMode) {
+        // A time of day timer is a new timer rather than a restart of the last one.
+        let event: AnalyticsEvent = mode == .timeWindow ? .playerSleepTimerAutomaticallyEnabled : .playerSleepTimerRestarted
         if let duration = setting.duration, duration.isFinite, duration > 0 {
-            playback().setSleepTimerInterval(duration)
-            Analytics.track(.playerSleepTimerRestarted, properties: ["time": duration, "reason": reason])
+            playback().setSleepTimerInterval(duration, automatic: true)
+            Analytics.track(event, properties: ["time": duration])
         } else if setting.sleepOnEpisodeEnd == true, setting.duration == nil {
-            let count = setting.numberOfEpisodes ?? preferences.legacyEpisodeCount
+            let count = setting.numberOfEpisodes ?? preferences.numberOfEpisodes
             guard count > 0 else { return }
             playback().setSleepTimerEpisodeCount(count)
-            Analytics.track(.playerSleepTimerRestarted, properties: ["time": "end_of_episode", "number_of_episodes": count, "reason": reason])
+            Analytics.track(event, properties: ["time": "end_of_episode", "number_of_episodes": count])
         } else {
             return
         }
-        FileLog.shared.addMessage("Sleep Timer: starting automatically (\(reason))")
+        FileLog.shared.addMessage("Sleep Timer: starting automatically (\(mode))")
     }
 
     private func restartSleepTimerAndPlayTone() {
@@ -168,10 +169,19 @@ class SleepTimerManager {
         static let defaultAutomaticTimer = SleepTimerSetting(duration: defaultAutomaticDuration, sleepOnEpisodeEnd: nil)
     }
 
-    enum AutomaticMode: Int, CaseIterable {
-        case off
-        case afterTimerEnds
-        case timeWindow
+    /// The raw values are persisted, so keep them when adding or reordering cases.
+    enum AutomaticMode: Int, CaseIterable, AnalyticsDescribable {
+        case off = 0
+        case afterTimerEnds = 1
+        case timeWindow = 2
+
+        var analyticsDescription: String {
+            switch self {
+            case .off: return "off"
+            case .afterTimerEnds: return "after_timer_ends"
+            case .timeWindow: return "time_of_day"
+            }
+        }
     }
 
     struct TimeWindow: JSONEncodable, JSONDecodable, Equatable {
@@ -194,6 +204,12 @@ class SleepTimerManager {
             }
             return currentMinute >= startMinute || currentMinute < endMinute
         }
+
+        /// When the window that `date` falls in closes, or nil when `date` is outside the window.
+        func end(ofWindowContaining date: Date, calendar: Calendar) -> Date? {
+            guard contains(date, calendar: calendar) else { return nil }
+            return calendar.nextDate(after: date, matching: DateComponents(hour: endMinute / 60, minute: endMinute % 60), matchingPolicy: .nextTime)
+        }
     }
 
     struct Preferences {
@@ -207,6 +223,10 @@ class SleepTimerManager {
             get {
                 if let rawValue = userDefaults.object(forKey: Constants.UserDefaults.automaticSleepTimerMode) as? Int,
                    let mode = AutomaticMode(rawValue: rawValue) {
+                    // Without the feature, a saved Time of Day choice keeps the restart switch on.
+                    if mode == .timeWindow, !FeatureFlag.sleepTimerTimeOfDay.enabled {
+                        return .afterTimerEnds
+                    }
                     return mode
                 }
                 let legacyEnabled = userDefaults.object(forKey: Constants.UserDefaults.autoRestartSleepTimer) as? Bool ?? true
@@ -256,8 +276,16 @@ class SleepTimerManager {
             nonmutating set { userDefaults.set(newValue, forKey: Constants.UserDefaults.sleepTimerFinishedEpisodeUuid) }
         }
 
-        var legacyEpisodeCount: Int {
-            userDefaults.object(forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes) as? Int ?? 1
+        /// When automatic timers are held off after the listener cancelled one during the chosen hours.
+        var automaticTimerHeldUntil: Date? {
+            get { userDefaults.object(forKey: Constants.UserDefaults.automaticSleepTimerHeldUntil) as? Date }
+            nonmutating set { userDefaults.set(newValue, forKey: Constants.UserDefaults.automaticSleepTimerHeldUntil) }
+        }
+
+        /// The number of episodes chosen for an end of episode timer in the player.
+        var numberOfEpisodes: Int {
+            get { userDefaults.object(forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes) as? Int ?? 1 }
+            nonmutating set { userDefaults.set(newValue, forKey: Constants.UserDefaults.sleepTimerNumberOfEpisodes) }
         }
     }
 }

@@ -3,7 +3,7 @@ import UIKit
 
 final class SleepTimerSettingsViewController: PCTableViewController {
     private enum Section { case modes, window, timer }
-    private enum TimerRow { case duration, endOfEpisode, stopAfter }
+    private enum TimerRow { case duration, stopAfter, endOfEpisode }
 
     private static let timeStepperCellId = "TimeStepperCell"
 
@@ -11,6 +11,8 @@ final class SleepTimerSettingsViewController: PCTableViewController {
     private var mode: SleepTimerManager.AutomaticMode
     private var window: SleepTimerManager.TimeWindow
     private var timer: SleepTimerManager.SleepTimerSetting
+    /// Kept apart from `timer` so choosing End of Episode and then Duration again restores the chosen length.
+    private var duration: TimeInterval
 
     private var sections: [Section] {
         mode == .timeWindow ? [.modes, .window, .timer] : [.modes]
@@ -21,11 +23,7 @@ final class SleepTimerSettingsViewController: PCTableViewController {
     }
 
     private var timerRows: [TimerRow] {
-        timerStopsAtEpisodeEnd ? [.duration, .endOfEpisode] : [.duration, .endOfEpisode, .stopAfter]
-    }
-
-    private var timerDuration: TimeInterval {
-        timer.duration ?? SleepTimerManager.SleepTimerSetting.defaultAutomaticDuration
+        timerStopsAtEpisodeEnd ? [.duration, .endOfEpisode] : [.duration, .stopAfter, .endOfEpisode]
     }
 
     init(preferences: SleepTimerManager.Preferences = .init()) {
@@ -33,6 +31,7 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         mode = preferences.mode
         window = preferences.timeWindow
         timer = preferences.automaticTimer
+        duration = preferences.automaticTimer.duration ?? SleepTimerManager.SleepTimerSetting.defaultAutomaticDuration
         super.init(style: .insetGrouped)
     }
 
@@ -47,13 +46,6 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         tableView.estimatedRowHeight = 70
         tableView.register(UINib(nibName: Self.timeStepperCellId, bundle: nil), forCellReuseIdentifier: Self.timeStepperCellId)
         insetAdjuster.setupInsetAdjustmentsForMiniPlayer(scrollView: tableView)
-        customRightBtn = UIBarButtonItem(barButtonSystemItem: .save, target: self, action: #selector(save))
-        updateSaveButton()
-    }
-
-    override func reloadData() {
-        super.reloadData()
-        updateSaveButton()
     }
 
     func numberOfSections(in tableView: UITableView) -> Int { sections.count }
@@ -70,7 +62,7 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         switch sections[indexPath.section] {
         case .modes:
             let choice = SleepTimerManager.AutomaticMode.allCases[indexPath.row]
-            let cell = textCell(title: choice.title, subtitle: choice.explanation)
+            let cell = textCell(title: choice.title, subtitle: choice.explanation(for: window))
             cell.accessoryType = mode == choice ? .checkmark : .none
             cell.accessibilityTraits = mode == choice ? [.button, .selected] : .button
             return cell
@@ -86,21 +78,17 @@ final class SleepTimerSettingsViewController: PCTableViewController {
                 } else {
                     self.window.endMinute = minute
                 }
-                self.updateSaveButton()
-                self.tableView.footerView(forSection: 1)?.textLabel?.text = self.windowFooter
-                // Resize the validation footer without replacing the active date picker.
-                self.tableView.beginUpdates()
-                self.tableView.endUpdates()
+                self.windowChanged()
             }
             return cell
         case .timer:
             switch timerRows[indexPath.row] {
             case .duration:
                 return timerChoiceCell(title: L10n.sleepTimerAutomaticDuration, selected: !timerStopsAtEpisodeEnd)
-            case .endOfEpisode:
-                return timerChoiceCell(title: L10n.sleepTimerEndOfEpisode, selected: timerStopsAtEpisodeEnd)
             case .stopAfter:
                 return stopAfterCell(tableView, indexPath: indexPath)
+            case .endOfEpisode:
+                return timerChoiceCell(title: L10n.sleepTimerEndOfEpisode, selected: timerStopsAtEpisodeEnd)
             }
         }
     }
@@ -109,17 +97,17 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
         switch sections[indexPath.section] {
         case .modes:
-            mode = SleepTimerManager.AutomaticMode.allCases[indexPath.row]
-            reloadData()
+            select(SleepTimerManager.AutomaticMode.allCases[indexPath.row])
         case .timer:
             switch timerRows[indexPath.row] {
             case .duration:
-                timer = .init(duration: timerDuration, sleepOnEpisodeEnd: nil)
-            case .endOfEpisode:
-                timer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
+                timer = .init(duration: duration, sleepOnEpisodeEnd: nil)
             case .stopAfter:
                 return
+            case .endOfEpisode:
+                timer = .init(duration: nil, sleepOnEpisodeEnd: true, numberOfEpisodes: 1)
             }
+            preferences.automaticTimer = timer
             reloadData()
         case .window:
             break
@@ -169,7 +157,6 @@ final class SleepTimerSettingsViewController: PCTableViewController {
     private func stopAfterCell(_ tableView: UITableView, indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: Self.timeStepperCellId, for: indexPath) as! TimeStepperCell
         let title = L10n.sleepTimerAutomaticStopAfter
-        let duration = timerDuration
         cell.cellLabel.text = title
         cell.cellSecondaryLabel.text = TimeFormatter.shared.minutesHoursFormatted(time: duration)
         cell.timeStepper.tintColor = ThemeColor.primaryInteractive01()
@@ -178,30 +165,39 @@ final class SleepTimerSettingsViewController: PCTableViewController {
         cell.timeStepper.currentValue = duration
         cell.configureAccessibilityLabel(text: title, time: Int(duration))
         cell.onValueChanged = { [weak self, weak cell] value in
-            self?.timer = .init(duration: value, sleepOnEpisodeEnd: nil)
+            guard let self else { return }
+            self.duration = value
+            self.timer = .init(duration: value, sleepOnEpisodeEnd: nil)
+            self.preferences.automaticTimer = self.timer
             cell?.cellSecondaryLabel.text = TimeFormatter.shared.minutesHoursFormatted(time: value)
             cell?.configureAccessibilityLabel(text: title, time: Int(value))
         }
         return cell
     }
 
-    private func updateSaveButton() {
-        customRightBtn?.isEnabled = mode != .timeWindow || window.isValid
+    private func select(_ newMode: SleepTimerManager.AutomaticMode) {
+        guard newMode != mode else { return }
+        let previousMode = mode
+        mode = newMode
+        preferences.mode = newMode
+        Settings.trackValueChanged(.settingsGeneralAutomaticSleepTimerChanged, value: newMode)
+        if (previousMode == .afterTimerEnds) != (newMode == .afterTimerEnds) {
+            Settings.trackValueToggled(.settingsGeneralAutoSleepTimerRestartToggled, enabled: newMode == .afterTimerEnds)
+        }
+        reloadData()
     }
 
-    @objc private func save() {
-        guard mode != .timeWindow || window.isValid else { return }
-        if window.isValid { preferences.timeWindow = window }
-        preferences.automaticTimer = timer
-        let previousMode = preferences.mode
-        preferences.mode = mode
-        if previousMode != mode {
-            Settings.trackValueChanged(.settingsGeneralAutomaticSleepTimerChanged, value: mode.rawValue)
-            if (previousMode == .afterTimerEnds) != (mode == .afterTimerEnds) {
-                Settings.trackValueToggled(.settingsGeneralAutoSleepTimerRestartToggled, enabled: mode == .afterTimerEnds)
-            }
+    private func windowChanged() {
+        // An invalid window isn't saved, so the last valid one stays in effect until the times differ again.
+        preferences.timeWindow = window
+        if let section = sections.firstIndex(of: .window) {
+            tableView.footerView(forSection: section)?.textLabel?.text = windowFooter
         }
-        navigationController?.popViewController(animated: true)
+        // Refresh the Time of Day hours and resize the footer without replacing the active date picker.
+        let timeOfDayRow = IndexPath(row: SleepTimerManager.AutomaticMode.allCases.firstIndex(of: .timeWindow) ?? 0, section: 0)
+        tableView.performBatchUpdates {
+            self.tableView.reloadRows(at: [timeOfDayRow], with: .none)
+        }
     }
 
     override func handleThemeChanged() { tableView.reloadData() }
@@ -243,7 +239,7 @@ private final class SleepTimerTimePickerCell: ThemeableCell {
     func configure(title: String, minute: Int) {
         label.text = title
         picker.accessibilityLabel = title
-        picker.date = Calendar.autoupdatingCurrent.date(from: DateComponents(year: 2001, month: 1, day: 15, hour: minute / 60, minute: minute % 60)) ?? .now
+        picker.date = SleepTimerManager.TimeWindow.date(atMinute: minute)
     }
 
     @objc private func timeChanged() {
@@ -266,11 +262,24 @@ extension SleepTimerManager.AutomaticMode {
         }
     }
 
-    var explanation: String {
+    func explanation(for window: SleepTimerManager.TimeWindow) -> String {
         switch self {
         case .off: return L10n.sleepTimerAutomaticOffDescription
         case .afterTimerEnds: return L10n.sleepTimerAutomaticAfterTimerEndsDescription
-        case .timeWindow: return L10n.sleepTimerAutomaticTimeWindowDescription
+        case .timeWindow:
+            return L10n.sleepTimerAutomaticTimeWindowDescription(Self.formattedTime(atMinute: window.startMinute),
+                                                                 Self.formattedTime(atMinute: window.endMinute))
         }
+    }
+
+    private static func formattedTime(atMinute minute: Int) -> String {
+        SleepTimerManager.TimeWindow.date(atMinute: minute).formatted(date: .omitted, time: .shortened)
+    }
+}
+
+extension SleepTimerManager.TimeWindow {
+    /// A date on a fixed day at `minute` past local midnight, for showing or picking a time of day.
+    static func date(atMinute minute: Int) -> Date {
+        Calendar.autoupdatingCurrent.date(from: DateComponents(year: 2001, month: 1, day: 15, hour: minute / 60, minute: minute % 60)) ?? .now
     }
 }

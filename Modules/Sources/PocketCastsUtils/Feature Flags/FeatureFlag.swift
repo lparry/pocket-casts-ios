@@ -240,6 +240,9 @@ public enum FeatureFlag: String, CaseIterable {
     /// Show a Live Activity on the Lock Screen and Dynamic Island while the sleep timer is running
     case sleepTimerLiveActivity
 
+    /// Automatically start a sleep timer when playback starts during the hours chosen in settings
+    case sleepTimerTimeOfDay
+
     /// Enable the network discovery Discover sections and podcast page entry points
     case networkDiscovery
 
@@ -423,6 +426,8 @@ public enum FeatureFlag: String, CaseIterable {
             true
         case .sleepTimerLiveActivity:
             true
+        case .sleepTimerTimeOfDay:
+            false
         case .networkDiscovery:
             true
         case .newEpisodeNotificationsPushOptOut:

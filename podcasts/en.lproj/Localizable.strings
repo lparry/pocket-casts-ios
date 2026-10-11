@@ -4801,8 +4801,8 @@
 "sleep_timer_automatic_after_timer_ends_description" = "Restart if you play again within 5 minutes of the timer ending.";
 /* Automatic sleep timer mode that activates at selected times of day */
 "sleep_timer_automatic_time_window" = "Time of Day";
-/* Explanation of automatic sleep timer activation inside the chosen time window */
-"sleep_timer_automatic_time_window_description" = "Start a sleep timer whenever you play during these hours.";
+/* Explanation of automatic sleep timer activation inside the chosen time window. %1$@ is the start time and %2$@ is the end time, for example 10:00 PM and 7:00 AM */
+"sleep_timer_automatic_time_window_description" = "Start a sleep timer whenever you play between %1$@ and %2$@.";
 /* Header above the start and end times of a daily sleep timer window */
 "sleep_timer_automatic_every_day" = "Every Day";
 /* Label for the start time of the automatic sleep timer window */

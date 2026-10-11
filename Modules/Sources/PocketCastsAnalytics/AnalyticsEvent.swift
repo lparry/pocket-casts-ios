@@ -490,6 +490,7 @@ public enum AnalyticsEvent: String {
     case playerSleepTimerExtended
     case playerSleepTimerCancelled
     case playerSleepTimerRestarted
+    case playerSleepTimerAutomaticallyEnabled
     case playerSleepTimerSettingsTapped
 
     // MARK: - Player: Shelf

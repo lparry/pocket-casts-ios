@@ -1,14 +1,17 @@
 import UIKit
 import XCTest
+@testable import PocketCastsUtils
 @testable import podcasts
 
 final class SleepTimerSettingsViewControllerTests: XCTestCase {
     private var suiteName: String!
     private var defaults: UserDefaults!
     private var preferences: SleepTimerManager.Preferences!
+    private let flags = FeatureFlagMock()
 
     override func setUp() {
         super.setUp()
+        flags.set(.sleepTimerTimeOfDay, value: true)
         suiteName = "SleepTimerSettingsTests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         preferences = .init(userDefaults: defaults)
@@ -17,6 +20,7 @@ final class SleepTimerSettingsViewControllerTests: XCTestCase {
 
     override func tearDown() {
         defaults.removePersistentDomain(forName: suiteName)
+        flags.reset()
         super.tearDown()
     }
 
@@ -27,7 +31,6 @@ final class SleepTimerSettingsViewControllerTests: XCTestCase {
         controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 2, section: 0))
         XCTAssertEqual(controller.numberOfSections(in: controller.tableView), 3)
         XCTAssertEqual(controller.tableView(controller.tableView, titleForHeaderInSection: 2), L10n.sleepTimer)
-        XCTAssertEqual(controller.customRightBtn?.isEnabled, true)
         controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 1, section: 0))
         XCTAssertEqual(controller.numberOfSections(in: controller.tableView), 1)
         controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 0, section: 0))
@@ -36,20 +39,17 @@ final class SleepTimerSettingsViewControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testModeIsSavedOnlyAfterSaveIsTapped() throws {
+    func testChoosingModeSavesImmediately() {
         let controller = SleepTimerSettingsViewController(preferences: preferences)
         controller.loadViewIfNeeded()
+        XCTAssertNil(controller.customRightBtn)
         controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 2, section: 0))
-        XCTAssertEqual(preferences.mode, .off)
-        XCTAssertEqual(controller.customRightBtn?.isEnabled, true)
-        let action = try XCTUnwrap(controller.customRightBtn?.action)
-        controller.perform(action)
         XCTAssertEqual(preferences.mode, .timeWindow)
         XCTAssertEqual(preferences.automaticTimer.duration, 10.minutes)
     }
 
     @MainActor
-    func testChosenDurationIsSavedOnlyAfterSaveIsTapped() throws {
+    func testStopAfterFollowsDurationAndSavesImmediately() throws {
         preferences.mode = .timeWindow
         preferences.lastSetting = .init(duration: 5.minutes, sleepOnEpisodeEnd: nil)
         let controller = SleepTimerSettingsViewController(preferences: preferences)
@@ -57,14 +57,13 @@ final class SleepTimerSettingsViewControllerTests: XCTestCase {
         XCTAssertEqual(controller.tableView(controller.tableView, numberOfRowsInSection: 2), 3)
         let durationCell = controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 0, section: 2))
         XCTAssertEqual(durationCell.accessoryType, .checkmark)
+        let endOfEpisodeCell = controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 2, section: 2))
+        XCTAssertEqual(endOfEpisodeCell.textLabel?.text, L10n.sleepTimerEndOfEpisode)
 
-        let stepperCell = try XCTUnwrap(controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 2, section: 2)) as? TimeStepperCell)
+        let stepperCell = try XCTUnwrap(controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 1, section: 2)) as? TimeStepperCell)
         XCTAssertEqual(stepperCell.timeStepper.currentValue, 10.minutes)
         stepperCell.timeStepper.currentValue = 45.minutes
         stepperCell.timeStepper.sendActions(for: .valueChanged)
-        XCTAssertEqual(preferences.automaticTimer.duration, 10.minutes)
-
-        controller.perform(try XCTUnwrap(controller.customRightBtn?.action))
         XCTAssertEqual(preferences.automaticTimer.duration, 45.minutes)
         XCTAssertEqual(preferences.lastSetting?.duration, 5.minutes)
     }
@@ -76,26 +75,23 @@ final class SleepTimerSettingsViewControllerTests: XCTestCase {
         let controller = SleepTimerSettingsViewController(preferences: preferences)
         controller.loadViewIfNeeded()
 
-        controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
+        controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 2, section: 2))
         XCTAssertEqual(controller.tableView(controller.tableView, numberOfRowsInSection: 2), 2)
         let endOfEpisodeCell = controller.tableView(controller.tableView, cellForRowAt: IndexPath(row: 1, section: 2))
         XCTAssertEqual(endOfEpisodeCell.accessoryType, .checkmark)
         XCTAssertTrue(endOfEpisodeCell.accessibilityTraits.contains(.selected))
-        controller.perform(try XCTUnwrap(controller.customRightBtn?.action))
         XCTAssertNil(preferences.automaticTimer.duration)
         XCTAssertEqual(preferences.automaticTimer.sleepOnEpisodeEnd, true)
         XCTAssertEqual(preferences.automaticTimer.numberOfEpisodes, 1)
 
-        let reopened = SleepTimerSettingsViewController(preferences: preferences)
-        reopened.loadViewIfNeeded()
-        reopened.tableView(reopened.tableView, didSelectRowAt: IndexPath(row: 0, section: 2))
-        XCTAssertEqual(reopened.tableView(reopened.tableView, numberOfRowsInSection: 2), 3)
-        reopened.perform(try XCTUnwrap(reopened.customRightBtn?.action))
-        XCTAssertEqual(preferences.automaticTimer.duration, 10.minutes)
+        // Switching back keeps the length chosen before End of Episode.
+        controller.tableView(controller.tableView, didSelectRowAt: IndexPath(row: 0, section: 2))
+        XCTAssertEqual(controller.tableView(controller.tableView, numberOfRowsInSection: 2), 3)
+        XCTAssertEqual(preferences.automaticTimer.duration, 20.minutes)
     }
 
     @MainActor
-    func testEqualTimesDisableSaveAndDoNotReplaceSavedWindow() throws {
+    func testEqualTimesShowErrorAndKeepSavedWindow() throws {
         preferences.mode = .timeWindow
         let originalWindow = preferences.timeWindow
         let controller = SleepTimerSettingsViewController(preferences: preferences)
@@ -106,16 +102,21 @@ final class SleepTimerSettingsViewControllerTests: XCTestCase {
         let endPicker = try XCTUnwrap(datePicker(in: endCell))
         endPicker.date = startPicker.date
         endPicker.sendActions(for: .valueChanged)
-        XCTAssertEqual(controller.customRightBtn?.isEnabled, false)
         XCTAssertEqual(controller.tableView(controller.tableView, titleForFooterInSection: 1), L10n.sleepTimerAutomaticInvalidWindow)
-        controller.perform(try XCTUnwrap(controller.customRightBtn?.action))
         XCTAssertEqual(preferences.timeWindow, originalWindow)
         endPicker.date = Calendar.current.date(byAdding: .hour, value: 1, to: startPicker.date)!
         endPicker.sendActions(for: .valueChanged)
-        XCTAssertEqual(controller.customRightBtn?.isEnabled, true)
-        controller.perform(try XCTUnwrap(controller.customRightBtn?.action))
+        XCTAssertEqual(controller.tableView(controller.tableView, titleForFooterInSection: 1), L10n.sleepTimerAutomaticWindowDescription)
         XCTAssertEqual(preferences.timeWindow.startMinute, originalWindow.startMinute)
         XCTAssertEqual(preferences.timeWindow.endMinute, 23 * 60)
+    }
+
+    @MainActor
+    func testTimeOfDayDescriptionShowsChosenHours() {
+        let window = SleepTimerManager.TimeWindow(startMinute: 21 * 60 + 30, endMinute: 6 * 60)
+        let start = SleepTimerManager.TimeWindow.date(atMinute: window.startMinute).formatted(date: .omitted, time: .shortened)
+        let end = SleepTimerManager.TimeWindow.date(atMinute: window.endMinute).formatted(date: .omitted, time: .shortened)
+        XCTAssertEqual(SleepTimerManager.AutomaticMode.timeWindow.explanation(for: window), L10n.sleepTimerAutomaticTimeWindowDescription(start, end))
     }
 
     @MainActor

@@ -48,7 +48,8 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(imageName: "download")
             cell.cellSwitch.isOn = podcast.autoDownloadOn() && Settings.autoDownloadEnabled()
 
-            cell.cellSwitch.removeTarget(self, action: #selector(autoDownloadChanged(_:)), for: UIControl.Event.valueChanged)
+            // Reused cells keep the targets of the row they were last, so clear them all
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(autoDownloadChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
@@ -59,7 +60,7 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(imageName: "settings_notifications")
             cell.cellSwitch.isOn = podcast.pushEnabled && NotificationsHelper.shared.pushEnabled()
 
-            cell.cellSwitch.removeTarget(self, action: #selector(notificationChanged(_:)), for: UIControl.Event.valueChanged)
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(notificationChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
@@ -70,7 +71,7 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
             cell.setImage(imageName: "upnext")
             cell.cellSwitch.isOn = podcast.autoAddToUpNextOn()
 
-            cell.cellSwitch.removeTarget(self, action: #selector(addToUpNextChanged(_:)), for: UIControl.Event.valueChanged)
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
             cell.cellSwitch.addTarget(self, action: #selector(addToUpNextChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
@@ -149,6 +150,17 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
                     Analytics.track(.podcastSettingsSkipLastChanged, properties: ["value": value])
                 }
             }
+
+            return cell
+        case .scanForAds:
+            let cell = tableView.dequeueReusableCell(withIdentifier: PodcastSettingsViewController.switchCellId, for: indexPath) as! SwitchCell
+            cell.cellLabel.text = L10n.adSkippingScanForAds
+            cell.cellSwitch.onTintColor = podcast.switchTintColor()
+            cell.setImage(UIImage(systemName: "forward.end"))
+            cell.cellSwitch.isOn = AdSkippingManager.shared.isScanning(podcastUuid: podcast.uuid)
+
+            cell.cellSwitch.removeTarget(nil, action: nil, for: .allEvents)
+            cell.cellSwitch.addTarget(self, action: #selector(scanForAdsChanged(_:)), for: UIControl.Event.valueChanged)
 
             return cell
         case .autoArchive:
@@ -370,6 +382,10 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
         Analytics.track(.podcastSettingsAutoAddUpNextToggled, properties: ["enabled": sender.isOn])
     }
 
+    @objc private func scanForAdsChanged(_ sender: UISwitch) {
+        AdSkippingManager.shared.setScanning(sender.isOn, podcastUuid: podcast.uuid)
+    }
+
     @objc private func notificationChanged(_ sender: UISwitch) {
         Analytics.track(.podcastSettingsNotificationsToggled, properties: ["enabled": sender.isOn])
         NotificationsHelper.shared.registerForPushNotifications() { [weak self] granted in
@@ -391,6 +407,10 @@ extension PodcastSettingsViewController: UITableViewDataSource, UITableViewDeleg
 
         if podcast.refreshAvailable {
             data.insert([.feedError], at: 0)
+        }
+
+        if FeatureFlag.autoAdSkip.enabled, let playbackSection = data.firstIndex(where: { $0.contains(.skipLast) }) {
+            data[playbackSection].append(.scanForAds)
         }
 
         if podcast.autoAddToUpNextOn() {

@@ -86,7 +86,7 @@ class ProfileViewController: PCViewController, UITableViewDataSource, UITableVie
     private let settingsCellId = "SettingsCell"
     private let endOfYearPromptCell = "EndOfYearPromptCell"
 
-    enum TableRow { case informationalBanner, kidsProfile, referralsClaim, allStats, downloaded, starred, listeningHistory, help, uploadedFiles, endOfYearPrompt, bookmarks }
+    enum TableRow { case informationalBanner, kidsProfile, referralsClaim, allStats, adScanning, downloaded, starred, listeningHistory, help, uploadedFiles, endOfYearPrompt, bookmarks }
 
     private lazy var informationalBannerCoordinator: InformationalBannerViewCoordinator = {
         let viewModel = InformationalBannerViewModel(bannerType: .profile)
@@ -376,6 +376,9 @@ class ProfileViewController: PCViewController, UITableViewDataSource, UITableVie
         case .allStats:
             cell.settingsImage.image = UIImage(named: "profile-stats")
             cell.settingsLabel.text = L10n.settingsStats
+        case .adScanning:
+            cell.settingsImage.image = UIImage(systemName: "forward.end")
+            cell.settingsLabel.text = L10n.adScanningTitle
         case .downloaded:
             cell.settingsImage.image = UIImage(named: "profile-download")
             cell.settingsLabel.text = L10n.downloads
@@ -452,6 +455,8 @@ class ProfileViewController: PCViewController, UITableViewDataSource, UITableVie
         case .allStats:
             let statsViewController = StatsViewController()
             navigationController?.pushViewController(statsViewController, animated: true)
+        case .adScanning:
+            navigationController?.pushViewController(AdScanningView.makeViewController(), animated: true)
         case .downloaded:
             let downloadController = DownloadsViewController()
             navigationController?.pushViewController(downloadController, animated: true)
@@ -500,7 +505,11 @@ class ProfileViewController: PCViewController, UITableViewDataSource, UITableVie
 
     private func refreshTableData() {
         var data: [[ProfileViewController.TableRow]]
-        data = [[.allStats, .downloaded, .uploadedFiles, .starred, .bookmarks, .listeningHistory, .help]]
+        data = [[.listeningHistory, .allStats, .downloaded, .uploadedFiles, .starred, .bookmarks, .help]]
+
+        if FeatureFlag.autoAdSkip.enabled, let downloadsIndex = data[0].firstIndex(of: .downloaded) {
+            data[0].insert(.adScanning, at: downloadsIndex)
+        }
 
         if EndOfYear.isEndOfYearActive, EndOfYear.isEligible {
             data[0].insert(.endOfYearPrompt, at: 0)

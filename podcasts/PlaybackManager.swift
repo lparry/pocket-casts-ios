@@ -34,6 +34,8 @@ class PlaybackManager: ServerPlaybackDelegate {
     }
 
     private var updateTimer: Timer?
+    /// A check for an ad that starts between progress ticks
+    private var adSkipCheck: DispatchWorkItem?
     private var updateCount = 0
 
     private var currentEffects: PlaybackEffects?
@@ -397,7 +399,25 @@ class PlaybackManager: ServerPlaybackDelegate {
 
         let currPos = currentTime()
         let backTime = max(currPos - amount, 0)
+        unzapAdsSkippedBack(from: currPos, to: backTime)
         seekTo(time: backTime, seekHint: .back)
+    }
+
+    /// Skipping back into or over an ad that was just zapped means the listener wants to hear it, which is the only way to
+    /// say so from a car or headphones
+    private func unzapAdsSkippedBack(from: TimeInterval, to: TimeInterval) {
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+        guard FeatureFlag.autoAdSkip.enabled, let episode = currentEpisode else { return }
+
+        let unzapped = AdSkippingManager.shared.unzapAds(in: episode, skippingBackFrom: from, to: to)
+        guard !unzapped.isEmpty else { return }
+
+        FileLog.shared.addMessage("Un-zapped \(unzapped.count) ads skipping back from \(from) to \(to) in \(episode.uuid)")
+        let title = unzapped.count == 1 ? L10n.adSkippingUnzapped : L10n.adSkippingUnzappedPlural(unzapped.count.localized())
+        Task { @MainActor in
+            Toast.show(title)
+        }
+#endif
     }
 
     func skipForward() {
@@ -407,10 +427,31 @@ class PlaybackManager: ServerPlaybackDelegate {
     private func skipForward(amount: TimeInterval) {
         analyticsPlaybackHelper.skipForward()
 
-        let forwardTime = min(currentTime() + amount, duration())
+        let currPos = currentTime()
+        if let adEnd = endOfPlayingAdBreak(at: currPos) {
+            seekTo(time: adEnd)
+            StatsManager.shared.addSkippedTime(adEnd - currPos)
+            return
+        }
+
+        let forwardTime = min(currPos + amount, duration())
         seekTo(time: forwardTime)
 
         StatsManager.shared.addSkippedTime(amount)
+    }
+
+    /// Skipping forward in an ad that's being let play, like self-promotion with that kind switched off, goes to the end
+    /// of the ad break, so it's easy to skip without zapping every ad of that kind
+    private func endOfPlayingAdBreak(at time: TimeInterval) -> TimeInterval? {
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+        guard FeatureFlag.autoAdSkip.enabled, let episode = currentEpisode,
+              let adEnd = AdSkippingManager.shared.skipForwardTarget(in: episode, at: time, duration: duration()) else { return nil }
+
+        FileLog.shared.addMessage("Skipping forward to the end of the ad break at \(adEnd) from \(time) in \(episode.uuid)")
+        return adEnd
+#else
+        return nil
+#endif
     }
 
     func skipToPreviousChapter(startPlaybackAfterSkip: Bool = false) {
@@ -530,6 +571,53 @@ class PlaybackManager: ServerPlaybackDelegate {
             }
         }
     }
+
+    /// Skips past an ad found in the downloaded file, offering to undo it
+    private func checkForAdSkip() {
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+        adSkipCheck?.cancel()
+        adSkipCheck = nil
+
+        guard FeatureFlag.autoAdSkip.enabled, isPlaying, !isSeeking, let episode = currentEpisode else { return }
+
+        let time = currentTime()
+        guard let skip = AdSkippingManager.shared.adSkip(in: episode, at: time) else {
+            scheduleAdSkipCheck(for: episode, after: time)
+            return
+        }
+
+        let episodeDuration = duration()
+        let skipTo = episodeDuration > 0 ? min(skip.end, episodeDuration) : skip.end
+        FileLog.shared.addMessage("Skipping \(skip.spans.count) ads (\(skip.spans.map(\.kind.rawValue).joined(separator: ", "))) from \(time) to \(skipTo) in \(episode.uuid)")
+        StatsManager.shared.addAutoSkipTime(skipTo - time)
+        seekTo(time: skipTo)
+
+        let episodeUuid = episode.uuid
+        let title = skip.spans.count == 1 ? L10n.adSkippingSkipped : L10n.adSkippingSkippedPlural(skip.spans.count.localized())
+        Task { @MainActor [weak self] in
+            Toast.show(title, actions: [.init(title: L10n.adSkippingUndo) { [weak self] in
+                AdSkippingManager.shared.restore(skip.spans, in: episodeUuid)
+                guard let self, currentEpisode?.uuid == episodeUuid else { return }
+                seekTo(time: time)
+            }])
+        }
+#endif
+    }
+
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+    /// The progress tick only comes once a second, so check again exactly when an ad that's about to start begins
+    private func scheduleAdSkipCheck(for episode: BaseEpisode, after time: TimeInterval) {
+        let rate = max(player?.playbackRate() ?? 1, 0.1)
+        guard let start = AdSkippingManager.shared.nextAdStart(in: episode, after: time, within: (updateTimerInterval + 0.5) * rate) else { return }
+
+        let check = DispatchWorkItem { [weak self] in
+            self?.checkForAdSkip()
+        }
+        adSkipCheck = check
+        // A moment after the start, so the player is definitely inside the ad
+        DispatchQueue.main.asyncAfter(deadline: .now() + (start - time) / rate + 0.05, execute: check)
+    }
+#endif
 
     var isSeeking: Bool {
         seekingTo != PlaybackManager.notSeeking
@@ -1186,6 +1274,11 @@ class PlaybackManager: ServerPlaybackDelegate {
         player?.setPlaybackRate(effects.playbackSpeed)
 
         updateAllNowPlayingData()
+
+        // A short ident at the very start would be over by the first progress tick
+        DispatchQueue.main.async { [weak self] in
+            self?.checkForAdSkip()
+        }
     }
 
     enum PlaybackError: Error {
@@ -1768,6 +1861,7 @@ class PlaybackManager: ServerPlaybackDelegate {
         }
 
         checkForChapterChange()
+        checkForAdSkip()
         fireProgressNotification()
 
         if updateCount > updatesPerSave {

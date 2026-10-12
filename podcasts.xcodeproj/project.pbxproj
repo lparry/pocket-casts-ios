@@ -2911,6 +2911,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		371E0318452B7C751D0C5611 /* Fingerprint */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Fingerprint; sourceTree = "<group>"; };
+		AD5C1A0000000000000000A1 /* Ad Skipping */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "Ad Skipping"; sourceTree = "<group>"; };
 		3F26BB7B2F4FC23E0007119B /* PocketCastsTests */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (3F26BBBE2F4FC23E0007119B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PocketCastsTests; sourceTree = "<group>"; };
 		3F26BBE52F4FC3090007119B /* WidgetExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (3F26BC052F4FC3090007119B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = WidgetExtension; sourceTree = "<group>"; };
 		3F26BC112F4FC3C90007119B /* PodcastsIntents */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (3F26BC1B2F4FC3CA0007119B /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = PodcastsIntents; sourceTree = "<group>"; };
@@ -4631,6 +4632,7 @@
 		BDBD53F717019B2A0048C8C5 /* Pocket Casts */ = {
 			isa = PBXGroup;
 			children = (
+				AD5C1A0000000000000000A1 /* Ad Skipping */,
 				3F584E4F2F568314005A3593 /* CarPlay */,
 				371E0318452B7C751D0C5611 /* Fingerprint */,
 				3F584E4D2F5682BA005A3593 /* Google Cast */,
@@ -5723,6 +5725,7 @@
 				9AB645122D51368300A842C8 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				AD5C1A0000000000000000A1 /* Ad Skipping */,
 				371E0318452B7C751D0C5611 /* Fingerprint */,
 				3F584D1D2F567E4A005A3593 /* Episode Info Coordinator */,
 				3F584D242F567E73005A3593 /* InAppPurchases */,

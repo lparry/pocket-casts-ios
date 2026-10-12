@@ -520,6 +520,39 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
         return skip.end - time > min(1, (skip.end - skip.start) / 4) ? skip : nil
     }
 
+    /// Where skipping forward should land when playback is in an ad that's playing rather than being zapped, because its
+    /// kind is switched off or it was un-zapped: the end of its break, where the show resumes. Nil for the usual skip.
+    func skipForwardTarget(in episode: BaseEpisode, at time: TimeInterval, duration: TimeInterval) -> TimeInterval? {
+        guard FeatureFlag.autoAdSkip.enabled, isScanning(episode), let analysis = currentAnalysis(for: episode) else { return nil }
+
+        let (restored, kinds) = playbackState.withLock { state in
+            var restored = state.restoredSpans[episode.uuid] ?? []
+            if let previewed = state.previewedSpans[episode.uuid] {
+                restored.insert(previewed)
+            }
+            return (restored, state.skippedKinds)
+        }
+        return Self.skipForwardTarget(in: analysis, at: time, skipping: kinds, restored: restored, duration: duration)
+    }
+
+    /// Ads after the one playing join its break whatever their kind, so the skip lands where the show resumes.
+    /// A suspect analysis may have the show marked as ads, so it's left alone.
+    static func skipForwardTarget(in analysis: EpisodeAdAnalysis, at time: TimeInterval, skipping kinds: Set<AdSpan.Kind>, restored: Set<AdSpan>, duration: TimeInterval) -> TimeInterval? {
+        guard !analysis.isSuspect else { return nil }
+
+        let spans = analysis.spans.sorted { $0.start < $1.start }
+        guard let index = spans.firstIndex(where: { $0.contains(time) && (!kinds.contains($0.kind) || restored.contains($0)) }) else { return nil }
+
+        var last = spans[index]
+        for span in spans[(index + 1)...] {
+            guard isSameBreak(last, span) else { break }
+            last = span
+        }
+
+        let end = duration > 0 ? min(last.end, duration) : last.end
+        return end > time ? end : nil
+    }
+
     /// How long after an ad ends a skip back over it still counts as wanting to hear it
     static let unzapWindow: TimeInterval = 120
 

@@ -1368,3 +1368,50 @@ final class NetworkBrandingTests: XCTestCase {
         XCTAssertFalse(current.isDueRescan)
     }
 }
+
+final class AdSkipForwardTests: XCTestCase {
+    private let selfPromo = AdSpan(start: 100, end: 130, kind: .selfPromo, sponsor: nil)
+    private let inserted = AdSpan(start: 132, end: 162, kind: .inserted, sponsor: nil)
+    private let allButSelfPromo = Set(AdSpan.Kind.allCases).subtracting([.selfPromo])
+
+    private func analysis(_ spans: [AdSpan], isSuspect: Bool = false) -> EpisodeAdAnalysis {
+        var analysis = EpisodeAdAnalysis(version: EpisodeAdAnalysis.currentVersion, episodeUuid: "e", analyzedAt: Date(), classifier: "openrouter:test/model", audioFileSize: 1, transcriptSegmentCount: 1, spans: spans)
+        analysis.isSuspect = isSuspect
+        return analysis
+    }
+
+    func testSkipsToTheEndOfAnAdWhoseKindIsSwitchedOff() {
+        XCTAssertEqual(AdSkippingManager.skipForwardTarget(in: analysis([selfPromo]), at: 105, skipping: allButSelfPromo, restored: [], duration: 600), 130)
+    }
+
+    func testSkipsToTheEndOfAnUnzappedAd() {
+        let kinds = Set(AdSpan.Kind.allCases)
+
+        XCTAssertEqual(AdSkippingManager.skipForwardTarget(in: analysis([inserted]), at: 140, skipping: kinds, restored: [inserted], duration: 600), 162)
+        // One that's being zapped is left to the zapping
+        XCTAssertNil(AdSkippingManager.skipForwardTarget(in: analysis([inserted]), at: 140, skipping: kinds, restored: [], duration: 600))
+    }
+
+    func testSkipsTheRestOfTheBreak() {
+        // Self-promotion that's let play, then an ad that would be zapped, 2s later
+        let later = AdSpan(start: 300, end: 330, kind: .inserted, sponsor: nil)
+
+        XCTAssertEqual(AdSkippingManager.skipForwardTarget(in: analysis([later, inserted, selfPromo]), at: 105, skipping: allButSelfPromo, restored: [], duration: 600), 162)
+    }
+
+    func testSkipsToTheEndEvenWhenItsAMomentAway() {
+        XCTAssertEqual(AdSkippingManager.skipForwardTarget(in: analysis([selfPromo]), at: 129.5, skipping: allButSelfPromo, restored: [], duration: 600), 130)
+    }
+
+    func testSkipsTheUsualAmountWhenTheAdsLookWrong() {
+        XCTAssertNil(AdSkippingManager.skipForwardTarget(in: analysis([selfPromo], isSuspect: true), at: 105, skipping: allButSelfPromo, restored: [], duration: 600))
+    }
+
+    func testSkipsTheUsualAmountOutsideAnAd() {
+        XCTAssertNil(AdSkippingManager.skipForwardTarget(in: analysis([selfPromo]), at: 90, skipping: allButSelfPromo, restored: [], duration: 600))
+    }
+
+    func testStopsAtTheEndOfTheEpisode() {
+        XCTAssertEqual(AdSkippingManager.skipForwardTarget(in: analysis([selfPromo]), at: 105, skipping: allButSelfPromo, restored: [], duration: 120), 120)
+    }
+}

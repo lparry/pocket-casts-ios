@@ -427,10 +427,31 @@ class PlaybackManager: ServerPlaybackDelegate {
     private func skipForward(amount: TimeInterval) {
         analyticsPlaybackHelper.skipForward()
 
-        let forwardTime = min(currentTime() + amount, duration())
+        let currPos = currentTime()
+        if let adEnd = endOfPlayingAdBreak(at: currPos) {
+            seekTo(time: adEnd)
+            StatsManager.shared.addSkippedTime(adEnd - currPos)
+            return
+        }
+
+        let forwardTime = min(currPos + amount, duration())
         seekTo(time: forwardTime)
 
         StatsManager.shared.addSkippedTime(amount)
+    }
+
+    /// Skipping forward in an ad that's being let play, like self-promotion with that kind switched off, goes to the end
+    /// of the ad break, so it's easy to skip without zapping every ad of that kind
+    private func endOfPlayingAdBreak(at time: TimeInterval) -> TimeInterval? {
+#if !APPCLIP && !os(watchOS) && !os(tvOS)
+        guard FeatureFlag.autoAdSkip.enabled, let episode = currentEpisode,
+              let adEnd = AdSkippingManager.shared.skipForwardTarget(in: episode, at: time, duration: duration()) else { return nil }
+
+        FileLog.shared.addMessage("Skipping forward to the end of the ad break at \(adEnd) from \(time) in \(episode.uuid)")
+        return adEnd
+#else
+        return nil
+#endif
     }
 
     func skipToPreviousChapter(startPlaybackAfterSkip: Bool = false) {

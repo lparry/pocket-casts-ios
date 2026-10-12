@@ -1,11 +1,55 @@
 import AVFoundation
 import Foundation
+import os
 import Speech
 
 /// Turns a local audio file into timestamped transcript lines
 protocol EpisodeTranscriber {
     /// `progress` is called with how far through the audio the transcript has got, from 0 to 1
     func transcribe(fileURL: URL, locale: Locale, progress: @escaping @Sendable (Double) -> Void) async throws -> [TranscriptSegment]
+}
+
+/// `SpeechAnalyzer` keeps going when its task is cancelled, so a cancelled transcription used to run to the end anyway, and
+/// then have its transcript thrown away. This stops the analysis when the task is cancelled, unless it has already finished.
+enum CancellableAnalysis {
+    private enum State {
+        case running, finished, cancelled
+    }
+
+    /// Runs `analysis`, calling `cancel` if the task is cancelled before it finishes. Throws `CancellationError` if it was
+    /// cancelled part way, since its results are incomplete, but returns normally if it finished before the cancellation.
+    static func run(isolation: isolated (any Actor)? = #isolation,
+                    _ analysis: () async throws -> Void,
+                    cancel: @escaping @Sendable () async -> Void) async throws {
+        let state = OSAllocatedUnfairLock(initialState: State.running)
+
+        try await withTaskCancellationHandler {
+            do {
+                try await analysis()
+            } catch where state.withLock({ $0 == .cancelled }) {
+                // Stopping the analysis can make it throw an error of its own
+                throw CancellationError()
+            }
+        } onCancel: {
+            let cancelling = state.withLock { state in
+                guard state == .running else { return false }
+                state = .cancelled
+                return true
+            }
+            if cancelling {
+                Task { await cancel() }
+            }
+        }
+
+        let finished = state.withLock { state in
+            guard state == .running else { return false }
+            state = .finished
+            return true
+        }
+        if !finished {
+            throw CancellationError()
+        }
+    }
 }
 
 /// Transcribes on device with `SpeechAnalyzer` and `SpeechTranscriber`
@@ -48,9 +92,13 @@ struct SpeechAnalyzerTranscriber: EpisodeTranscriber {
         }
 
         do {
-            if let lastSample = try await analyzer.analyzeSequence(from: audioFile) {
-                try await analyzer.finalizeAndFinish(through: lastSample)
-            } else {
+            try await CancellableAnalysis.run {
+                if let lastSample = try await analyzer.analyzeSequence(from: audioFile) {
+                    try await analyzer.finalizeAndFinish(through: lastSample)
+                } else {
+                    await analyzer.cancelAndFinishNow()
+                }
+            } cancel: {
                 await analyzer.cancelAndFinishNow()
             }
         } catch {

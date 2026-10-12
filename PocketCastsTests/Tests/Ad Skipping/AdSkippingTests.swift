@@ -793,6 +793,90 @@ final class TranscriptStoreTests: XCTestCase {
     }
 }
 
+final class CancellableAnalysisTests: XCTestCase {
+    func testStopsTheAnalysisWhenTheTaskIsCancelled() async {
+        let analysis = FakeAnalysis()
+        let done = expectation(description: "Analysis returned")
+        let task = Task {
+            defer { done.fulfill() }
+            try await CancellableAnalysis.run({ await analysis.runUntilStopped() }, cancel: { analysis.stop() })
+        }
+
+        task.cancel()
+        await fulfillment(of: [done], timeout: 5)
+
+        XCTAssertTrue(analysis.wasStopped)
+        do {
+            try await task.value
+            XCTFail("A cancelled analysis has incomplete results, so it should throw")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
+    func testReportsAnErrorFromStoppingTheAnalysisAsACancellation() async {
+        let analysis = FakeAnalysis()
+        let done = expectation(description: "Analysis returned")
+        let task = Task {
+            defer { done.fulfill() }
+            try await CancellableAnalysis.run({
+                await analysis.runUntilStopped()
+                throw URLError(.cancelled)
+            }, cancel: { analysis.stop() })
+        }
+
+        task.cancel()
+        await fulfillment(of: [done], timeout: 5)
+
+        do {
+            try await task.value
+            XCTFail("A cancelled analysis should throw")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
+    func testReturnsAnAnalysisThatFinishesWithoutBeingCancelled() async throws {
+        let analysis = FakeAnalysis()
+
+        try await CancellableAnalysis.run({}, cancel: { analysis.stop() })
+
+        XCTAssertFalse(analysis.wasStopped)
+    }
+
+    /// Like `SpeechAnalyzer`, carries on regardless of its task being cancelled, until it's told to stop
+    private final class FakeAnalysis: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stopped = false
+        private var waiter: CheckedContinuation<Void, Never>?
+
+        var wasStopped: Bool {
+            lock.withLock { stopped }
+        }
+
+        func runUntilStopped() async {
+            await withCheckedContinuation { continuation in
+                let alreadyStopped = lock.withLock {
+                    if !stopped { waiter = continuation }
+                    return stopped
+                }
+                if alreadyStopped {
+                    continuation.resume()
+                }
+            }
+        }
+
+        func stop() {
+            let waiter = lock.withLock {
+                stopped = true
+                defer { self.waiter = nil }
+                return self.waiter
+            }
+            waiter?.resume()
+        }
+    }
+}
+
 final class AdScanTimingsTests: XCTestCase {
     func testShowsStepsUnderAMinuteInSeconds() {
         XCTAssertTrue(AdZappingDetails.formatTimeTaken(0.04).contains("0"))

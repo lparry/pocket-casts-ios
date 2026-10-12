@@ -1030,11 +1030,12 @@ final class AdSkippingManager: ObservableObject, @unchecked Sendable {
                 self?.transcriptionProgressed(uuid, progress: progress, since: started, clock: clock)
             }
         }
+        // The transcriber only returns a finished transcript, so keep it even if the scan was cancelled as it finished,
+        // and pick up from finding ads next time. Saved even when empty, so it isn't transcribed again only to come out empty.
+        try? transcriptStore.save(transcript, for: uuid, audioFileSize: fileSize, audioDuration: audioDuration)
         try Task.checkCancellation()
 
         transcriptionTimes[uuid] = (clock.now - started).seconds
-        // Saved even when empty, so it isn't transcribed again only to come out empty
-        try? transcriptStore.save(transcript, for: uuid, audioFileSize: fileSize, audioDuration: audioDuration)
 
         guard !transcript.isEmpty else {
             throw AdSkippingError.emptyTranscript
